@@ -1,0 +1,11 @@
+﻿Console.WriteLine("Hello World");
+int age = 18;
+double price = 9.99;
+bool study = true;
+char grade = 'A';
+string name = "米哈游";
+Console.WriteLine("我今年" + age + "岁");
+Console.WriteLine("奶茶的价格是" + price + "元");
+Console.WriteLine("正在学习变成：" + study);
+Console.WriteLine("我的学习成绩是" + grade);
+Console.WriteLine("我的目标公司是" + name);
