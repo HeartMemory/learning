@@ -1,0 +1,16 @@
+﻿Console.WriteLine("请输入第一个数字:");
+string num1 = Console.ReadLine();
+double a = double.Parse(num1);
+Console.WriteLine("请输入第二个数字:");
+string num2 = Console.ReadLine();
+double b = Convert.ToDouble(num2);
+double add = a + b;
+double sub = a - b;
+double mul = a * b;
+double div = a / b;
+double mod = a % b;
+Console.WriteLine(a + " + " + b + " = " + add);
+Console.WriteLine(a + " - " + b + " = " + sub);
+Console.WriteLine(a + " * " + b + " = " + mul);
+Console.WriteLine(a + " / " + b + " = " + div);
+Console.WriteLine(a + " % " + b + " = " + mod);
