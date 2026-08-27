@@ -1,0 +1,15 @@
+# .NET 构建产物
+bin/
+obj/
+*.user
+
+# VS Code
+.vs/
+.vscode/
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 临时文件
+*.tmp
