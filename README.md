@@ -7,22 +7,26 @@
 
 ```
 学习实践/
-├── LeetCode/          # 算法题解（一律用 C# 写，题号命名：如 0001_TwoSum.cs）
-├── CSharpPractice/    # C# 主线练习（按学习主题分文件夹）
+├── LeetCode/          # 算法题解（按题组织：题号-题名/，详见 LeetCode/README.md）
+├── CSharpPractice/    # C# 主线练习（按天组织：DayN-主题/，详见 CSharpPractice/README.md）
 ├── Projects/          # 每周里程碑小项目（计算器、图书管理系统等）
+├── Notes/             # 每日复盘（按天：Day-YYYY-MM-DD.md）
 └── README.md          # 本文件
 ```
 
 ## 打卡规则
 
-1. 每天学习结束后，把当天代码 commit 到 GitHub
-2. 提交信息格式：`Day 08-28: [主题] 描述`，例如 `Day 08-28: Hello World + 变量类型演示`
-3. 每日复盘三句话写在 Notes 或 commit message 里
+1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
+2. **其他内容按天上传**：当天的 C# 练习、小项目、复盘在同一天 commit，复盘写进 Notes/
+3. 提交信息格式：`Day MM-DD: [主题] 描述`
+4. 每日复盘三句话 → Notes/Day-YYYY-MM-DD.md
 
-## 进度追踪
+## 打卡进度
 
-| 周次 | 日期 | C# 主题 | 算法主题 | 里程碑 |
-|---|---|---|---|---|
-| 第1周 | 8/28 - 9/3 | 环境/语法/类型/流程控制 | 数组入门 | 控制台计算器 |
+| 日期 | 学习内容 | LeetCode | 状态 |
+|---|---|---|---|
+| 8/27 周四 | Day1: Hello World/变量/输入输出 + Day2提前: 运算符/类型转换/计算器雏形 | — | ✅ |
+| 8/28 周五 | LeetCode 两数之和（暴力解法）| ✅ 1 题 | ✅ |
+| 8/29 周六 | 数组题 2 道 + if/else/switch/三元 + 计算器分支 | 待做 | ⏳ |
 
-（每周日复盘后更新本周进度）
+（每天收工后更新）
