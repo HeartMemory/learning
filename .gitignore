@@ -13,3 +13,6 @@ Thumbs.db
 
 # 临时文件
 *.tmp
+
+# WorkBuddy 本地数据（含隐私，不上传）
+.workbuddy/
