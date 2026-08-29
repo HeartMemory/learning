@@ -16,3 +16,6 @@ Thumbs.db
 
 # WorkBuddy 本地数据（含隐私，不上传）
 .workbuddy/
+
+# 交接文档（含个人信息，不上传）
+HANDOVER.md
