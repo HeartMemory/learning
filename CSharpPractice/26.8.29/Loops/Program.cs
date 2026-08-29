@@ -2,10 +2,10 @@
 using System.Diagnostics.CodeAnalysis;
 
 
-int add = 0;
-int mid = 0;
-int result = 0;
-int sum = 0;
+int add = 0;  //累加器
+int mid = 0;  //中间值，乘法表里的乘积
+int result = 0;  //数字总和
+int sum = 0;  //每次输入的数字，用于累加
 for(int i = 1;i <= 100; i++)
 {
     add +=i;
@@ -19,7 +19,7 @@ for(int i = 1;i < 10; i++)
         mid = i * j;
         Console.Write(j + "*" + i + "=" + mid + "\t");
     }
-    Console.Write("\n");
+    Console.WriteLine();
 }
 
 do

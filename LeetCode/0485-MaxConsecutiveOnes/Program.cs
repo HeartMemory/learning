@@ -22,7 +22,6 @@ public class Solution {
                 result = max;
                 max = 0;
             }else{max = 0;}
-
         }
         if(max > result)
             {
