@@ -12,6 +12,7 @@
 | 485 | 最大连续 1 的个数 | 简单 | 8/28 | 一次遍历 + 计数器 O(n) | [0485-MaxConsecutiveOnes](0485-MaxConsecutiveOnes/) |
 | 283 | 移动零 | 简单 | 8/29 | 一次遍历覆盖写（零计数器）O(n) | [0283-MoveZeroes](0283-MoveZeroes/) |
 | 121 | 买卖股票的最佳时机 | 简单 | 8/29 | 单向遍历 + 历史最低价 O(n)（错误版存档见[错题本01](../Notes/错题本.md)） | [0121-BestTimeToBuyAndSellStock](0121-BestTimeToBuyAndSellStock/) |
+| 53 | 最大子数组和 | 中等 | 8/30 | Kadane：单向遍历，延续/重启取大 O(n)（错误版存档见[错题本03](../Notes/错题本.md)） | [0053-MaximumSubarray](0053-MaximumSubarray/) |
 
 ## 计划（第 1 周：数组入门）
 
