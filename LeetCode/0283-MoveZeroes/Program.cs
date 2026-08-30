@@ -21,19 +21,19 @@ Console.WriteLine(string.Join(",", t5)); // 期望 1,2,0（边界：0在中间�
 
 public class Solution {
     public void MoveZeroes(int[] nums) {
-        int zero = 0;  //0的个数
+        int zero = 0;
         for(int i = 0;i < nums.Length; i++)
         {
             if(nums[i] == 0)
             {
                 zero += 1;
-            }
-            else if(zero != 0)
+            }else if(zero != 0)
             {
                 nums[i - zero] = nums[i];
                 nums[i] = 0;
             }
         }
-        return;
+        // 复盘盲写：凭记忆重写「零计数器 + 覆盖写」解法
+        // 提醒自己：zero == 0 时能不能清零当前位？
     }
 }
