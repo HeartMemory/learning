@@ -20,7 +20,7 @@
 
 1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
 2. **其他内容按天上传**：C# 练习目录用日期命名（如 `26.8.27-HelloWorld`），复盘写进 Notes/
-3. 提交信息格式：`Day MM-DD: [主题] 描述`
+3. 提交信息格式：`MM-DD: [主题] 描述`
 4. 每日复盘三句话 → Notes/YYYY-MM-DD.md
 
 ## 打卡进度
