@@ -3,7 +3,7 @@ int age = 18;
 double price = 9.99;
 bool study = true;
 char grade = 'A';
-string name = "米哈游";
+string name = "游戏公司";
 Console.WriteLine("我今年" + age + "岁");
 Console.WriteLine("奶茶的价格是" + price + "元");
 Console.WriteLine("正在学习编程：" + study);
