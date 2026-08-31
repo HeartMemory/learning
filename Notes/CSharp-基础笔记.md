@@ -86,4 +86,4 @@ while (!double.TryParse(Console.ReadLine(), out num))
 
 - 运行：终端 `dotnet run`（不要 F5，ReadKey 会因输入重定向报错）
 - 新建项目：`dotnet new console -o 目录名`
-- 提交格式：`Day MM-DD: [主题] 描述`
+- 提交格式：`MM-DD: [主题] 描述`
