@@ -19,29 +19,18 @@ Console.WriteLine(string.Join(",", t4)); // 期望 1,2,3
 
 public class Solution {
     public void Merge(int[] nums1, int m, int[] nums2, int n) {
-        if(m != 0)
+        int k = m + n - 1;
+        int i = m - 1;
+        int j = n - 1;
+        while(j >= 0)
         {
-            for(int i = n - 1;i >= 0; i--)
+            if(i >= 0 && nums1[i] > nums2[j])
             {
-                for(int j = m - 1;j >= 0; j--)
-                {
-                    if(nums1[j] > nums2[i])
-                    {
-                        nums1[j+i+1] = nums1[j];
-                    }
-                    else
-                    {
-                        nums1[j+i+1] = nums2[i];
-                        break;
-                    }
-                }
+                nums1[k--] = nums1[i--];
             }
-        }
-        else if(n !=0)
-        {
-            for(int i = 0;i < n; i++)
+            else
             {
-                nums1[i] = nums2[i];
+                nums1[k--] = nums2[j--];
             }
         }
         // TODO: nums1 的前 m 个是有效元素，后面预留了 n 个 0 的空位；
