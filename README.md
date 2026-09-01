@@ -8,7 +8,7 @@
 ```
 学习实践/
 ├── LeetCode/          # 算法题解（按题组织：题号-题名/，详见 LeetCode/README.md）
-├── CSharpPractice/    # C# 主线练习（按日期组织：日期-主题/，详见 CSharpPractice/README.md）
+├── CSharpPractice/    # C# 主线练习（按 年/月/日/主题 组织，详见 CSharpPractice/README.md）
 ├── Projects/          # 里程碑成品（按技术栈分大类）
 │   ├── CSharp/        #   C# 完成的工具/项目（如 Calculator 循环菜单版）
 │   └── Unity/         #   Unity 游戏（第 4 周起）
@@ -19,7 +19,7 @@
 ## 打卡规则
 
 1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
-2. **其他内容按天上传**：C# 练习目录用日期命名（如 `26.8.27-HelloWorld`），复盘写进 Notes/
+2. **其他内容按天上传**：C# 练习目录按 年/月/日/主题 组织（如 `CSharpPractice/2026/08/27/HelloWorld`），复盘写进 Notes/
 3. 提交信息格式：`MM-DD: [主题] 描述`
 4. 每日复盘三句话 → Notes/YYYY-MM-DD.md
 
@@ -29,8 +29,8 @@
 |---|---|---|---|
 | 8/27 周四 | Hello World/变量/输入输出 + 运算符/类型转换/计算器雏形（提前） | — | ✅ |
 | 8/28 周五 | 两数之和（暴力解法）+ 加一 + 最大连续 1 的个数 + C# 分支语句/计算器（超前） | ✅ 3 题 | ✅ |
-| 8/29 周六 | 休息日加餐：提前学 Day5 循环 + 乘法表/求和/求和器 + LeetCode 283/121（121 含错题重写） | ✅ 2 题 | ✅ |
+| 8/29 周六 | 休息日加餐：提前学循环 + 乘法表/求和/求和器 + LeetCode 283/121（121 含错题重写） | ✅ 2 题 | ✅ |
 | 8/30 周日 | 复盘日：121/283 盲写重做全过 + 错题本×3 + 首道中等题 53 最大子数组和 AC（Kadane） | ✅ 1 题 | ✅ |
-| 8/31 周一 | Day6：数组详解 + List 基础 + TryParse 输入验证 → **里程碑：计算器循环菜单版**（Projects/CSharp/Calculator） | — | ✅ |
+| 8/31 周一 | 数组详解 + List 基础 + TryParse 输入验证 → **里程碑：计算器循环菜单版**（Projects/CSharp/Calculator） | — | ✅ |
 
 （每天收工后更新）
