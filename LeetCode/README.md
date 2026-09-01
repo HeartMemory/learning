@@ -13,6 +13,8 @@
 | 283 | 移动零 | 简单 | 8/29 | 一次遍历覆盖写（零计数器）O(n) | [0283-MoveZeroes](0283-MoveZeroes/) |
 | 121 | 买卖股票的最佳时机 | 简单 | 8/29 | 单向遍历 + 历史最低价 O(n)（错误版存档见[错题本01](../Notes/错题本.md)） | [0121-BestTimeToBuyAndSellStock](0121-BestTimeToBuyAndSellStock/) |
 | 53 | 最大子数组和 | 中等 | 8/30 | Kadane：单向遍历，延续/重启取大 O(n)（错误版存档见[错题本03](../Notes/错题本.md)） | [0053-MaximumSubarray](0053-MaximumSubarray/) |
+| 88 | 合并两个有序数组 | 简单 | 9/1 | 三指针从后往前原地合并 O(m+n)（错误版存档见[错题本04](../Notes/错题本.md)） | [0088-MergeSortedArray](0088-MergeSortedArray/) |
+| 118 | 杨辉三角 | 简单 | 9/1 | 嵌套 List<List<int>> 逐行生成 O(n²) | [0118-PascalsTriangle](0118-PascalsTriangle/) |
 
 ## 计划（第 1 周：数组入门）
 
