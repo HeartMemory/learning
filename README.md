@@ -12,7 +12,7 @@
 ├── Projects/          # 里程碑成品（按技术栈分大类）
 │   ├── CSharp/        #   C# 完成的工具/项目（如 Calculator 循环菜单版）
 │   └── Unity/         #   Unity 游戏（第 4 周起）
-├── Notes/             # 每日复盘（按日期：YYYY-MM-DD.md）
+├── Notes/             # 每日复盘（按 年/月/日：YYYY/MM/DD.md）+ 错题本 + 基础笔记
 └── README.md          # 本文件
 ```
 
@@ -21,7 +21,7 @@
 1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
 2. **其他内容按天上传**：C# 练习目录按 年/月/日/主题 组织（如 `CSharpPractice/2026/08/27/HelloWorld`），复盘写进 Notes/
 3. 提交信息格式：`MM-DD: [主题] 描述`
-4. 每日复盘三句话 → Notes/YYYY-MM-DD.md
+4. 每日复盘三句话 → Notes/YYYY/MM/DD.md
 
 ## 打卡进度
 
