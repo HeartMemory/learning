@@ -87,3 +87,27 @@ while (!double.TryParse(Console.ReadLine(), out num))
 - 运行：终端 `dotnet run`（不要 F5，ReadKey 会因输入重定向报错）
 - 新建项目：`dotnet new console -o 目录名`
 - 提交格式：`MM-DD: [主题] 描述`
+
+## 10. 字符串与常用方法（09-01/02）
+
+**核心认知：string 不可变**——`s[i] = 'x'` 编译报错，任何「修改」都产生新字符串。
+
+| 成员 | 作用 |
+|---|---|
+| `s.Length` / `s[i]` | 长度 / 取字符（char 类型，可越界崩溃）|
+| `ToUpper() / ToLower()` | 大小写转换（返回新串）|
+| `Substring(start, len)` | 截取 |
+| `IndexOf(x)` | 查位置，找不到返回 -1 |
+| `Contains / Replace / Split / Trim` | 包含 / 替换 / 切分 / 去首尾空白 |
+| `char.IsDigit / IsLetter / IsWhiteSpace` | 字符类型判断 |
+
+**char 与 int 互通（ASCII 技巧）**：
+- `c - 'a'` → 字母转 0-25 下标（char 参与算术即转数字）
+- `(char)('a' + i)` → 反向转回字母
+- ⚠️ `char.IsLetter` 对所有语言字母为 true，`é - 'a'` 会数组越界——纯 a-z 场景用范围检查 `c >= 'a' && c <= 'z'`
+
+**倒序两种实现**：循环 `+=`（法 A，直观）vs `ToCharArray()` 首尾交换后 `new string(chars)`（法 B，LeetCode 344 标准解）。
+
+**回文判断**：双指针一头一尾往中间走（88 题三指针的镜像）。注意空字符串要先判 `Length == 0`，大小写敏感与否是设计决策（要合并先 `ToLower()`）。
+
+**输出技巧**：统计结果点名打印（只输出出现过的）——`if (count[i] > 0) WriteLine($"{(char)('a'+i)}: {count[i]}");`
