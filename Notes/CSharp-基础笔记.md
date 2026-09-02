@@ -87,6 +87,9 @@ while (!double.TryParse(Console.ReadLine(), out num))
 - 运行：终端 `dotnet run`（不要 F5，ReadKey 会因输入重定向报错）
 - 新建项目：`dotnet new console -o 目录名`
 - 提交格式：`MM-DD: [主题] 描述`
+- git 全局代理：`http://127.0.0.1:7897`（Clash，push GitHub 必需，没开会连接失败）
+- gh CLI 2.98.0 已登录，push 免密（完整路径 `C:\Program Files\GitHub CLI\gh.exe`）
+- .NET SDK 8.0.424 ｜ VS Code 已开自动保存 ｜ 未装 Visual Studio（dotnet CLI 足够）
 
 ## 10. 字符串与常用方法（09-01/02）
 
