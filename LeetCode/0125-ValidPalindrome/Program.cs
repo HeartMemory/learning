@@ -6,6 +6,29 @@ Console.WriteLine(sol.IsPalindrome("0P"));                             // 期望
 
 public class Solution {
     public bool IsPalindrome(string s) {
+        List<char> chars = new List<char>();
+        for(int i = 0;i < s.Length;i++)
+        {
+            if (char.IsLetterOrDigit(s[i]))
+            {
+                chars.Add(char.ToLower(s[i]));
+            }else if (char.IsNumber(s[i]))
+            {
+                chars.Add(s[i]);
+            }
+        }
+        int left = 0;
+        int right = chars.Count-1;
+        while(left < right)
+        {
+            if(chars[left] != chars[right])
+            {
+                return false;
+            }
+            left++;
+            right--;
+        }
+        return true;
         // TODO: 只考虑字母和数字、忽略大小写，判断是否回文
         // 提示：char.IsLetterOrDigit 过滤 + char.ToLower 统一 + 双指针
     }
