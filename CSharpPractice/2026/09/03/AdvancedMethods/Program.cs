@@ -1,16 +1,38 @@
-﻿using System.Text.Encodings.Web;
-
-Console.WriteLine(Tools.Max(3, 5));
+﻿Console.WriteLine(Tools.Max(3, 5));
 Console.WriteLine(Tools.Max(3.5, 2.1));
 Console.WriteLine(Tools.Max(3, 5, 9));
 Console.WriteLine(Factorial(10));
 Console.WriteLine(Factorial(20));
 Console.WriteLine(Fibonacci(35));
+Console.WriteLine(Fib(35));
 Console.WriteLine(Tools.CountChar("aaaaa","aaa"));
+
+static long Fib(int n)
+{
+    if(n <= 0)
+    {
+        return 0;
+    }else if(n == 1)
+    {
+        return 1;
+    }else
+    {
+        long a = 0;
+        long b = 1;
+        long next = 0;
+        for(int i = 2;i <= n; i++)
+        {
+            next = a+b;
+            a = b;
+            b = next;
+        }
+        return next;
+    }
+}
 
 static long Fibonacci(int n)
 {
-    if(n == 0)
+    if(n <= 0)
     {
         return 0;
     }else if(n == 1)
