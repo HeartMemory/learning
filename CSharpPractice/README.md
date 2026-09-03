@@ -13,6 +13,7 @@
 | 2026-08-31 | 数组与 List + TryParse 输入验证 | 数组统计 + List 成绩单（含边界修复） | [2026/08/31/ArrayAndList](2026/08/31/ArrayAndList/) |
 | 2026-09-01 | 字符串与常用方法（提前） | 倒序两种实现 / ASCII 字符统计 / 回文双指针 | [2026/09/01/Strings](2026/09/01/Strings/) |
 | 2026-09-02 | 方法：定义/参数/返回值/作用域 | 方法工具箱：CountChar / IsPalindrome / Reverse / ReadNumber | [2026/09/02/Methods](2026/09/02/Methods/) |
+| 2026-09-03 | 方法进阶：重载 + 递归 | Max 三重载（Tools 类）/ Factorial(20!) / Fibonacci / CountChar 子串重载 | [2026/09/03/AdvancedMethods](2026/09/03/AdvancedMethods/) |
 
 ## 里程碑成品（`Projects/CSharp/`）
 
