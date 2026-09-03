@@ -115,7 +115,43 @@ while (!double.TryParse(Console.ReadLine(), out num))
 
 **输出技巧**：统计结果点名打印（只输出出现过的）——`if (count[i] > 0) WriteLine($"{(char)('a'+i)}: {count[i]}");`
 
+## 11. 方法进阶：重载与递归（09-03）
+
+**重载（Overload）**：同名方法、不同参数列表（类型/个数/顺序），编译器按实参自动配对。返回值不同、参数相同 ≠ 重载（编译错误）。例：`Math.Max` 的 int/double 版本、`Console.WriteLine` 的几十个重载。
+
+**⚠️ 重载是类成员特权**：顶层直接写的方法是**本地函数**，不支持重载（CS0128）。重载方法必须包进类：
+
+```csharp
+static class Tools
+{
+    public static int Max(int a, int b) { ... }        // 不写 public 默认 private，外部调不到
+    public static double Max(double a, double b) { ... }
+}
+// 调用：Tools.Max(3, 5)
+```
+
+**顶层程序文件结构铁律**：可执行语句全部在前，类型声明（class）全部在后（CS8803）。
+
+**访问修饰符**（可见范围滑块）：
+`public`（谁都能访问）⊃ `protected internal` ⊃ `internal` / `protected`（本项目内 / 本类+子类）⊃ `private protected` ⊃ `private`（默认，仅本类）
+现阶段记住：**public 给外人，private 留自己，protected 留儿子**（第 3 周继承时登场）。类成员不写修饰符默认 private。
+
+**递归**：方法调用自己。两要素缺一不可：①终止条件（base case）②每次调用问题规模必须缩小。缺①爆栈 StackOverflowException；②不成立死循环。
+
+```csharp
+static long Factorial(int n)
+{
+    if (n <= 1) return 1;              // 0! = 1! = 1（基准值错了全链全错）
+    return n * Factorial(n - 1);
+}
+```
+
+- 递归 vs 循环：递归优雅贴合数学定义，循环快；递归版 Fib(35) 会因重复计算明显变慢（循环版无此问题）
+- `int` 存 13! 就溢出，`long` 撑到 20! ——数据类型有边界
+
+**三元运算符 `条件 ? 值A : 值B`**：if/else 的表达式版，三个槽位（条件/两分支）都能放方法调用（非 void），类型必须匹配。选值用三元，做动作用 if/else。
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`ReadNumber`（CalculatorV2）**：现在输入流结束（null）时只能返回 0 凑合——学到**异常处理 / 可空类型**后，改成把「无输入」上抛给主循环统一处理的正规写法（2026-09-02 记）
-- [ ] 学完**重载/递归**后：回顾 `ReadNumber` 的提示语设计是否可以用重载简化
+- [ ] 学完**重载/递归**后：回顾 `ReadNumber` 的提示语设计是否可以用重载简化（2026-09-03 重载已学，待实践）
