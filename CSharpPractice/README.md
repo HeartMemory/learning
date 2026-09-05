@@ -20,6 +20,7 @@
 - [Calculator](../Projects/CSharp/Calculator/)：计算器循环菜单版（历史记录 / 输入验证 / 除 0 保护 / 0 退出）
 - [CalculatorV2](../Projects/CSharp/CalculatorV2/)：计算器函数化重构版（运算 / 输入 / 菜单全部拆成方法，与 V1 对照学习）
 - [StringStats](../Projects/CSharp/StringStats/)：字符串统计工具（次数查询 / 字母统计 / 倒序 / 回文）
+- [StringToolbox](../Projects/CSharp/StringToolbox/)：字符串工具箱收官版（五功能全方法化 + 重载 + 输入重试上限 + null 防御）
 
 ## 后续计划（Block 1 剩余部分）
 
