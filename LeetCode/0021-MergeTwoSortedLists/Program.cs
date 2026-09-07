@@ -42,8 +42,7 @@ public class ListNode {
 public class Solution {
     public ListNode MergeTwoLists(ListNode list1, ListNode list2) {
         ListNode dummy = new ListNode();
-        ListNode tail = new ListNode();
-        dummy = tail;
+        ListNode tail = dummy;
         while (true)
         {
             if(list1 == null)

@@ -50,9 +50,8 @@ public class Solution {
             {
                 tail.next = head;
                 tail = tail.next;
-            }
+            }else{tail.next = null;}
             head = head.next;
-            tail.next = null;
         }
         return dummy.next;
         // TODO: 删除链表中所有值为 val 的节点，返回新链表的头
