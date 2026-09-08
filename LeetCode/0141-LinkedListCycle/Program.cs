@@ -30,18 +30,16 @@ public class Solution {
     public bool HasCycle(ListNode head) {
         ListNode slow = head;
         ListNode fast = head;
-        while (true)
+        while (fast != null && fast.next != null)
         {
-            if(fast != null && fast.next != null)
+            fast = fast.next.next;
+            slow = slow.next;
+            if(slow == fast)
             {
-                fast = fast.next.next;
-                slow = slow.next;
-                if(slow == fast)
-                {
-                    return true;
-                }
-            }else{return false;}
+                return true;
+            }
         }
+        return false;
         // TODO: 判断链表中是否有环
         // ⚠️ 有环链表千万不能 while(cur != null) 遍历——永远走不到头，死循环！
         // 快慢指针（Floyd 判圈）：slow 每次走 1 步，fast 每次走 2 步
