@@ -16,6 +16,7 @@
 | 2026-09-03 | 方法进阶：重载 + 递归 | Max 三重载（Tools 类）/ Factorial(20!) / Fibonacci / CountChar 子串重载 | [2026/09/03/AdvancedMethods](2026/09/03/AdvancedMethods/) |
 | 2026-09-07 | OOP 第一课：类/对象/构造函数/this/引用 | Student 类起步：类/构造/字段/方法/双对象独立验证 + 属性入门（Age/Name 门卫/计算属性/构造走属性） | [2026/09/07/StudentClass](2026/09/07/StudentClass/) |
 | 2026-09-08 | 封装收尾 + 静态成员 | Encapsulation（IReadOnlyList 只读眼镜/卫语句/静态校验源）+ StaticMembers（const/static readonly/TotalCount 计数器/构造函数链） | [2026/09/08/Encapsulation](2026/09/08/Encapsulation/) · [2026/09/08/StaticMembers](2026/09/08/StaticMembers/) |
+| 2026-09-09 | 继承入门（提前）+ this/base 专题 | Character/Hero/Party：base(...) 构造链 / this(...) 构造链 / this 传参（party.Add(this)）/ get-only 属性与 private set 封装墙 | [2026/09/09/Inheritance](2026/09/09/Inheritance/) |
 
 ## 里程碑成品（`Projects/CSharp/`）
 
@@ -27,8 +28,9 @@
 ## 后续计划（Block 1 剩余 + Block 2）
 
 - [x] 09-07~09-08：OOP 第一课（类/构造/属性）+ 静态成员 + 封装收尾（超前完成）
+- [x] 09-09 晚：继承起步 + this/base 专题（Inheritance 练习，超前完成——09-10 补课勾销）
 - [ ] 09-10：**装 Unity Hub**（提前启动下载）+ 学生类收尾验收
-- [ ] 09-11：继承入门（父类/子类/base）→ 角色类继承起步
+- [ ] 09-11：继承正课（protected/多态预备）+ 栈与队列 232/225
 - [ ] 09-12：多态/虚方法/重写 → 🏆 角色类继承小 demo
 - [ ] 09-13（周日）：复盘日 → **产出 Block 2 详细计划**（09-14~09-27）
 - [ ] 09-17 起：Unity 与 C# 并行（打砖块：对象池回收砖块/子弹 + Animator 动画；成品录屏 ≤30 秒 + 3 截图存档）

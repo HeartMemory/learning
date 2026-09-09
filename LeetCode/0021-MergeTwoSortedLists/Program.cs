@@ -1,6 +1,4 @@
 ﻿// ═══════ 顶级语句区（测试）═══════
-using System.Formats.Asn1;
-
 Solution sol = new Solution();
 ListNode m1 = sol.MergeTwoLists(Build(new int[] { 1, 2, 4 }), Build(new int[] { 1, 3, 4 }));
 Console.WriteLine(Show(m1)); // 期望 1→1→2→3→4→4
