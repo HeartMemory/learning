@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | 1 | 两数之和 | 8/28 | 暴力解法（双层循环）O(n²) | [0001-TwoSum](0001-TwoSum/) |
 | 13 | 罗马数字转整数 | 9/4 | 逐字符查值 + 右邻比较定加减 O(n) | [0013-RomanToInteger](0013-RomanToInteger/) |
-| 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n) + 递归版（09-09 重写练习） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
+| 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n)；递归版（09-09 重写：终止条件 + 摘头递归，信任返回值接线） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
 | 66 | 加一 | 8/28 | 末位遍历进位（9→0，否则 +1 返回；全 9 扩容）O(n) | [0066-PlusOne](0066-PlusOne/) |
 | 83 | 删除排序链表中的重复元素 | 9/8 | 单指针原地跳过：有序 → 重复必相邻，相等跳过 cur 不动 O(n) | [0083-RemoveDuplicatesFromSortedList](0083-RemoveDuplicatesFromSortedList/) |
 | 88 | 合并两个有序数组 | 9/1 | 三指针从后往前原地合并 O(m+n)（[错题本04](../Notes/错题本.md)） | [0088-MergeSortedArray](0088-MergeSortedArray/) |
