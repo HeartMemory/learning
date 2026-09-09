@@ -3,11 +3,12 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（15 题）
+## 简单（17 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
 | 1 | 两数之和 | 8/28 | 暴力解法（双层循环）O(n²) | [0001-TwoSum](0001-TwoSum/) |
+| 13 | 罗马数字转整数 | 9/4 | 逐字符查值 + 右邻比较定加减 O(n) | [0013-RomanToInteger](0013-RomanToInteger/) |
 | 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n) + 递归版（09-09 重写练习） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
 | 66 | 加一 | 8/28 | 末位遍历进位（9→0，否则 +1 返回；全 9 扩容）O(n) | [0066-PlusOne](0066-PlusOne/) |
 | 83 | 删除排序链表中的重复元素 | 9/8 | 单指针原地跳过：有序 → 重复必相邻，相等跳过 cur 不动 O(n) | [0083-RemoveDuplicatesFromSortedList](0083-RemoveDuplicatesFromSortedList/) |
@@ -22,6 +23,7 @@
 | 283 | 移动零 | 8/29 | 一次遍历覆盖写（零计数器）O(n)（[错题本02](../Notes/错题本.md)） | [0283-MoveZeroes](0283-MoveZeroes/) |
 | 344 | 反转字符串 | 9/3 | 双指针原地交换 O(n) | [0344-ReverseString](0344-ReverseString/) |
 | 389 | 找不同 | 9/4 | 全字符异或，成对抵消 O(n) 时间 O(1) 空间 | [0389-FindTheDifference](0389-FindTheDifference/) |
+| 485 | 最大连续 1 的个数 | 8/28 | 一次遍历 + 计数器 O(n) | [0485-MaxConsecutiveOnes](0485-MaxConsecutiveOnes/) |
 
 ## 中等（2 题）
 
