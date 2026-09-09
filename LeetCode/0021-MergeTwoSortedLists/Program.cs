@@ -11,6 +11,9 @@ Console.WriteLine(Show(m2)); // 期望（空）
 ListNode m3 = sol.MergeTwoLists(null, Build(new int[] { 0 }));
 Console.WriteLine(Show(m3)); // 期望 0
 
+ListNode m4 = sol.MergeTwoListsRecursive(Build(new int[] { 1, 2, 4 }), Build(new int[] { 1, 3, 4 }));
+Console.WriteLine(Show(m4)); // 期望 1→1→2→3→4→4（递归版，与迭代版对照）
+
 // ═══════ 类型与工具区（文件底部）═══════
 static ListNode Build(int[] vals) {
     ListNode head = null;
@@ -40,6 +43,24 @@ public class ListNode {
 }
 
 public class Solution {
+    // 递归版（09-09 练习）：合并两条链 = 较小的头 + MergeTwoLists(剩余部分)
+    // 递归两要素：终止条件（一方为 null → 返回另一方）；规模缩小（每次摘掉一个头）
+    public ListNode MergeTwoListsRecursive(ListNode list1, ListNode list2) {
+        if(list1 == null) return list2;
+        if(list2 == null) return list1;
+        if(list1.val <= list2.val)
+        {
+            list1. next = MergeTwoListsRecursive(list1.next,list2);
+            return list1;
+        }
+        else
+        {
+            list2.next = MergeTwoListsRecursive(list1,list2.next);
+            return list2;
+        }
+        // TODO: 三行搞定——终止条件 ×2 + 比较摘头 + 递归
+    }
+
     public ListNode MergeTwoLists(ListNode list1, ListNode list2) {
         ListNode dummy = new ListNode();
         ListNode tail = dummy;

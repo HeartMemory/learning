@@ -3,7 +3,7 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按题号排序。
 
-## 简单（14 题）
+## 简单（15 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
@@ -13,7 +13,8 @@
 | 125 | 验证回文串 | 9/3 | IsLetterOrDigit 过滤 + ToLower + 双指针 | [0125-ValidPalindrome](0125-ValidPalindrome/) |
 | 242 | 有效的字母异位词 | 9/3 | int[26] 计数 +1/-1 全零校验 O(n) | [0242-ValidAnagram](0242-ValidAnagram/) |
 | 203 | 移除链表元素 | 9/7 | 哑节点 + tail 原地拼接，断悬尾 O(n) | [0203-RemoveLinkedListElements](0203-RemoveLinkedListElements/) |
-| 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n)（链表入门双题） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
+| 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n) + 递归版（09-09 重写练习） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
+| 82 | 删除排序链表中的重复元素 II | 9/9 | 哑节点 + prev/cur 状态机：跳过整族跨接，prev 不动 O(n)（中等思维简单标签） | [0082-RemoveDuplicatesFromSortedListII](0082-RemoveDuplicatesFromSortedListII/) |
 | 283 | 移动零 | 8/29 | 一次遍历覆盖写（零计数器）O(n)（[错题本02](../Notes/错题本.md)） | [0283-MoveZeroes](0283-MoveZeroes/) |
 | 344 | 反转字符串 | 9/3 | 双指针原地交换 O(n) | [0344-ReverseString](0344-ReverseString/) |
 | 389 | 找不同 | 9/4 | 全字符异或，成对抵消 O(n) 时间 O(1) 空间 | [0389-FindTheDifference](0389-FindTheDifference/) |
