@@ -18,6 +18,7 @@
 | 2026-09-08 | 封装收尾 + 静态成员 | Encapsulation（IReadOnlyList 只读眼镜/卫语句/静态校验源）+ StaticMembers（const/static readonly/TotalCount 计数器/构造函数链） | [2026/09/08/Encapsulation](2026/09/08/Encapsulation/) · [2026/09/08/StaticMembers](2026/09/08/StaticMembers/) |
 | 2026-09-09 | 继承入门（提前）+ this/base 专题 | Character/Hero/Party：base(...) 构造链 / this(...) 构造链 / this 传参（party.Add(this)）/ get-only 属性与 private set 封装墙 | [2026/09/09/Inheritance](2026/09/09/Inheritance/) |
 | 2026-09-11 | 继承正课：protected 访问级别 | 三种访问级别家族模型（private 日记 / protected 传家宝 / public 公告栏）+ HP `{ get; protected set; }`：子类可写外界不可（Sacrifice 献祭场景 + 编译错误实感） | [2026/09/11/Protected](2026/09/11/Protected/) |
+| 2026-09-11 | 多态（提前消化 09-12） | 角色类多态：virtual/override/base.成员 → **钩子模式重构**（骨架锁流程 + `protected virtual OnHit()` 开细节），基底版先 commit 存档再重构 | [2026/09/11/Polymorphism](2026/09/11/Polymorphism/) |
 
 ## 里程碑成品（`Projects/CSharp/`）
 
@@ -32,6 +33,7 @@
 - [x] 09-09 晚：继承起步 + this/base 专题（Inheritance 练习，超前完成——09-10 补课勾销）
 - [ ] 09-10：**装 Unity Hub**（提前启动下载）+ 学生类收尾验收
 - [x] 09-11：继承正课（protected 访问级别）+ 栈与队列 232/225（均已完成）
-- [ ] 09-12：多态/虚方法/重写（virtual/override/base.成员）→ 🏆 角色类继承小 demo（**首次建到仓库 Projects/Unity/ 下，配 Unity .gitignore**）
+- [x] 09-11：protected 访问级别 + **多态**（virtual/override/base.成员 + 钩子模式）——均已完成（多态提前一天）
+- [ ] 09-12：🏆 **角色类多态小 demo 综合应用**（多态正课已提前完成，明天直接产物化）
 - [ ] 09-13（周日）：复盘日 → **产出 Block 2 详细计划**（09-14~09-27）
 - [ ] 09-17 起：Unity 与 C# 并行（打砖块：对象池回收砖块/子弹 + Animator 动画；成品录屏 ≤30 秒 + 3 截图存档）
