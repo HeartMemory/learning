@@ -3,7 +3,7 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（19 题）
+## 简单（20 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
@@ -20,6 +20,7 @@
 | 141 | 环形链表 | 9/8 | 快慢指针判圈（Floyd）O(n) 时间 O(1) 空间 | [0141-LinkedListCycle](0141-LinkedListCycle/) |
 | 203 | 移除链表元素 | 9/7 | 哑节点 + tail 原地拼接，断悬尾 O(n) | [0203-RemoveLinkedListElements](0203-RemoveLinkedListElements/) |
 | 206 | 反转链表 | 9/8 | 头插法：存后继 → 接结果头 → 前进 O(n) | [0206-ReverseLinkedList](0206-ReverseLinkedList/) |
+| 225 | 用队列实现栈 | 9/11 | 单队列绕圈：新元素入队后老元素"出队即入队"绕一圈顶到队头 O(n)（对照双队列中转版，两种解法都写过） | [0225-ImplementStackUsingQueues](0225-ImplementStackUsingQueues/) |
 | 232 | 用栈实现队列 | 9/10 | 双栈倒手：inStack 管进、outStack 管出；outStack 空时倒手一次，顺序翻转 O(n) 均摊（陷阱：for 条件引用会变的 Count） | [0232-ImplementQueueUsingStacks](0232-ImplementQueueUsingStacks/) |
 | 242 | 有效的字母异位词 | 9/3 | int[26] 计数 +1/-1 全零校验 O(n) | [0242-ValidAnagram](0242-ValidAnagram/) |
 | 283 | 移动零 | 8/29 | 一次遍历覆盖写（零计数器）O(n)（[错题本02](../Notes/错题本.md)） | [0283-MoveZeroes](0283-MoveZeroes/) |
@@ -41,7 +42,7 @@
 - [x] 回顾错题（09-06 复盘日：121/283 盲写重做 + List 戒断练习）
 - [x] 栈与队列入门（09-09 晚提前：20 有效的括号 ✓）
 - [x] 232 用栈实现队列（09-10 ✓——双栈倒手模型）
-- [ ] 225 用队列实现栈（09-11，与 232 反向对照）
+- [x] 225 用队列实现栈（09-11 ✓——单队列绕圈 + 双队列中转，两种解法对照）
 - [ ] 回顾错题（09-13 复盘日）
 
 > 进阶预告：两数之和的哈希表解法（O(n)）—— 第 5 周学完 Dictionary 后回来优化。
