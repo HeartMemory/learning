@@ -38,9 +38,12 @@ public class Character {
     }
 
     // virtual：给子类发"改写许可证"
-    public virtual void Attack() {
+    public void Attack() {
         Console.WriteLine($"{Name} 发动了基础攻击！");
+        OnHit();                          // ← 可变点：空钩子
+        Console.WriteLine("攻击结束。");   // ← 固定流程
     }
+    protected virtual void OnHit() { }
 
     public void ShowStatus() {
         Console.WriteLine($"{Name} HP={HP}");
@@ -57,8 +60,7 @@ public class Hero : Character {
     // TODO 1：override 改写 Attack——先调用 base.Attack() 打出基础攻击那一行，
     //         再打印"剑士挥剑斩击！"
     //         （体会：不写 base.Attack() 会怎样？父类那行就消失了——保留 + 扩展）
-    public override void Attack() {
-        base.Attack();
+    protected override void OnHit() {
         Console.WriteLine("剑士挥剑斩击！");
     }
 }
@@ -68,7 +70,7 @@ public class Monster : Character {
 
     // TODO 2：override 改写 Attack——这次完全自定义，不调父类：
     //         直接打印"[Name] 扑咬！"
-    public override void Attack() {
+    protected override void OnHit() {
         Console.WriteLine($"「{Name}」 扑咬！");
     }
 }
