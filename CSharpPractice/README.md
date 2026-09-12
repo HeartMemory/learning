@@ -26,6 +26,7 @@
 - [CalculatorV2](../Projects/CSharp/CalculatorV2/)：计算器函数化重构版（运算 / 输入 / 菜单全部拆成方法，与 V1 对照学习）
 - [StringStats](../Projects/CSharp/StringStats/)：字符串统计工具（次数查询 / 字母统计 / 倒序 / 回文）
 - [StringToolbox](../Projects/CSharp/StringToolbox/)：字符串工具箱收官版（五功能全方法化 + 重载 + 输入重试上限 + null 防御）
+- [CharacterBattle](../Projects/CSharp/CharacterBattle/)：**角色对战模拟器**（第 5 号成品）——继承 + 多态（`List<Character>` 混装）+ 钩子模式（CalcDamage）+ 封装（`protected set`）+ 静态统计 + 战斗主循环
 
 ## 后续计划（Block 1 剩余 + Block 2）
 
@@ -34,6 +35,6 @@
 - [ ] 09-10：**装 Unity Hub**（提前启动下载）+ 学生类收尾验收
 - [x] 09-11：继承正课（protected 访问级别）+ 栈与队列 232/225（均已完成）
 - [x] 09-11：protected 访问级别 + **多态**（virtual/override/base.成员 + 钩子模式）——均已完成（多态提前一天）
-- [ ] 09-12：🏆 **角色类多态小 demo 综合应用**（多态正课已提前完成，明天直接产物化）
+- [x] 09-12：🏆 **角色类多态小 demo**（CharacterBattle 成品完成，第 5 号）
 - [ ] 09-13（周日）：复盘日 → **产出 Block 2 详细计划**（09-14~09-27）
 - [ ] 09-17 起：Unity 与 C# 并行（打砖块：对象池回收砖块/子弹 + Animator 动画；成品录屏 ≤30 秒 + 3 截图存档）
