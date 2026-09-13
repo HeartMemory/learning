@@ -27,40 +27,41 @@ public class MyQueue {
     private Stack<int> inStack = new Stack<int>();
     private Stack<int> outStack = new Stack<int>();
 
-    // TODO 1: 入队——直接压进 inStack 即可（一行）
-    public void Push(int a){inStack.Push(a);} 
-    // TODO 2 (核心): 私有辅助方法"倒手"——仅当 outStack 为空时执行：
-    //                把 inStack 的元素逐个 Pop 出来 Push 进 outStack
-    //                想清楚：为什么倒一次手之后，outStack 的栈顶就是"最早的元素"？
-    private void EnsureOutHasItems()
-    {
-        if(outStack.Count != 0) return;
-        while (inStack.Count != 0)
-        {
-            outStack.Push(inStack.Pop());
-        }
-    }
-    // TODO 3: 出队——先确保倒手过，再 Pop outStack 并返回
+    // TODO（盲写重做）：入队
+    public void Push(int a) {inStack.Push(a);}
+
+    // TODO（盲写重做）：出队——返回队头元素并移除
     public int Pop()
     {
-        EnsureOutHasItems();
+        if(outStack.Count == 0)
+        {
+            while(inStack.Count != 0)
+            {
+                outStack.Push(inStack.Pop());
+            }
+        }
         return outStack.Pop();
     }
-    // TODO 4: 看队头——和出队几乎一样，只是 Pop 换成 Peek
+
+    // TODO（盲写重做）：看队头——返回队头元素但不移除
     public int Peek()
     {
-        EnsureOutHasItems();
+        if(outStack.Count == 0)
+        {
+            while(inStack.Count != 0)
+            {
+                outStack.Push(inStack.Pop());
+            }
+        }
         return outStack.Peek();
     }
-    // TODO 5: 判空——两个栈都空才算空
+
+    // TODO（盲写重做）：判空——队列为空时返回 true
     public bool Empty()
     {
         if(inStack.Count == 0 && outStack.Count == 0) return true;
         return false;
-    } 
+    }
 }
 
-// ═══════ 提示备忘 ═══════
-// Stack<T> API：Push / Pop（弹出并返回）/ Peek（看但不弹）/ Count
-// 本题精髓："倒手"只发生在 outStack 为空时——outStack 还有东西就绝不能倒，
-//           否则 4→5→6 那组测试会暴露顺序错误
+// 验收标准：dotnet run 后 11 行输出与测试区注释中的期望完全一致
