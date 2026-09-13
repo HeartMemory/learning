@@ -15,6 +15,16 @@ Console.WriteLine(Show(r3)); // 期望（空）
 ListNode t4 = Build(new int[] { });
 Console.WriteLine(Show(sol.DeleteDuplicates(t4))); // 期望（空）
 
+// ── 复盘日补充：重复族在【末尾】的边界（盲写暴露的测试盲区）──
+ListNode t5 = Build(new int[] { 1, 2, 2 });
+Console.WriteLine(Show(sol.DeleteDuplicates(t5))); // 期望 1（末尾的 2 族整族删掉，不能留尾巴）
+
+ListNode t6 = Build(new int[] { 1, 1, 2, 2 });
+Console.WriteLine(Show(sol.DeleteDuplicates(t6))); // 期望（空）（两个重复族全删光）
+
+ListNode t7 = Build(new int[] { 1, 2, 3, 3, 4, 4 });
+Console.WriteLine(Show(sol.DeleteDuplicates(t7))); // 期望 1→2（末尾连续两个重复族）
+
 // ═══════ 类型与工具区（文件底部）═══════
 static ListNode Build(int[] vals) {
     ListNode head = null;
@@ -44,6 +54,9 @@ public class ListNode {
 }
 
 public class Solution {
+    // TODO（盲写重做）：有序链表中，删除所有「值重复出现」的节点——重复的全删，一个不留
+    //   要求：通过上方 4 组测试（常规 / 头节点重复 / 两元素全重复 / 空链表）
+    //   验收：dotnet run 后 4 行输出与注释中的期望完全一致
     public ListNode DeleteDuplicates(ListNode head) {
         ListNode dummy = new ListNode();
         ListNode cur = head;
@@ -53,8 +66,8 @@ public class Solution {
             if(cur.next != null && cur.val == cur.next.val)
             {
                 while(cur.next != null && cur.val == cur.next.val) cur = cur.next;
-                cur = cur.next;
-                prev.next = cur;
+                    cur = cur.next;
+                    prev.next = cur; 
             }
             else
             {
@@ -64,13 +77,36 @@ public class Solution {
             }
         }
         return dummy.next;
-        // TODO: 有序链表，删除所有「值重复出现」的节点——重复的全删，一个不留
-        // 与 83 的区别：83 保留一个（cur 跳过重复即可）；本题整族删除
-        // 哑节点是必需品：如果头节点本身重复，新头会变（t2 测试）
-        // 思路提示：dummy + prev（结果链尾）+ cur（探测指针）
-        //   cur 沿探测：只要 cur.val == cur.next.val 就一直前移（跳过整族重复）
-        //   探测停下后：若 cur 就是 prev.next（没有跳过任何节点）→ 接上、prev 前进
-        //              若跳过了整族 → prev.next = cur（直接跨接），prev 不动（cur 可能还是重复的）
-        //   循环条件：cur != null（访问 cur.next 前先判空）
     }
+
+    // ══════════ 等价优化版（复习对照用，未启用）══════════════════════════
+    // 思路：跨接只在 else 分支做（省掉 if 里"跳过即接"），循环结束后统一断悬尾
+    //
+    //   while (cur != null) {
+    //       if (cur.next != null && cur.val == cur.next.val) {
+    //           while (cur.next != null && cur.val == cur.next.val) cur = cur.next;
+    //           cur = cur.next;              // 跳过整族后「不接」，留给下一轮 else
+    //       } else {
+    //           prev.next = cur;             // 唯一的接链点
+    //           prev = prev.next;
+    //           cur = cur.next;
+    //       }
+    //   }
+    //   prev.next = null;                    // ★ 收尾断悬尾（否则末尾可能挂着已删除节点）
+    //   return dummy.next;
+    //
+    // ── 两版对比 ──
+    //   当前版（上面已实现）：跨接在 if 里完成——跳过整族立刻接上
+    //     · 优点：链在任何时刻都保持完整，不依赖"后面还有没有节点"（末尾重复族也安全）
+    //     · 代价：重复族在中间时，同一赋值会在 else 里再做一次（幂等，无害）
+    //
+    //   优化版（本注释）：跨接只在 else 完成 + 循环外断尾
+    //     · 优点：赋值次数最少
+    //     · 代价：必须记得收尾断尾——忘了就是悬尾 bug，而且它离主逻辑很远、忘得很自然
+    //
+    //   取舍结论：**保留当前版**——用一次幂等的冗余赋值，换掉一个"必须记得做"的隐形义务。
+    //            （幂等的冗余是廉价的，被遗忘的收尾是昂贵的）
+    //
+    //   关联：203 移除链表元素用的是"悬尾断开"模式——同一思路在不同约束下的两种解法
+    // ══════════════════════════════════════════════════════════════════
 }
