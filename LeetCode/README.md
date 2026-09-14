@@ -3,11 +3,11 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（20 题）
+## 简单（21 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
-| 1 | 两数之和 | 8/28 | 暴力解法（双层循环）O(n²) | [0001-TwoSum](0001-TwoSum/) |
+| 1 | 两数之和 | 8/28（09-14 哈希重写） | 暴力 O(n²) + **哈希表 O(n)**：Dictionary 存「数字→下标」，先查互补数再存自己 | [0001-TwoSum](0001-TwoSum/) |
 | 13 | 罗马数字转整数 | 9/4 | 逐字符查值 + 右邻比较定加减 O(n) | [0013-RomanToInteger](0013-RomanToInteger/) |
 | 20 | 有效的括号 | 9/9 | 栈就近配对：遇左括号压"期待右括号"，右括号来比栈顶；空栈防线 + 终检栈空 O(n) | [0020-ValidParentheses](0020-ValidParentheses/) |
 | 21 | 合并两个有序链表 | 9/7 | 哑节点 + tail 逐个摘取 O(m+n)；递归版（09-09 重写：终止条件 + 摘头递归，信任返回值接线） | [0021-MergeTwoSortedLists](0021-MergeTwoSortedLists/) |
@@ -20,6 +20,7 @@
 | 141 | 环形链表 | 9/8 | 快慢指针判圈（Floyd）O(n) 时间 O(1) 空间 | [0141-LinkedListCycle](0141-LinkedListCycle/) |
 | 203 | 移除链表元素 | 9/7 | 哑节点 + tail 原地拼接，断悬尾 O(n) | [0203-RemoveLinkedListElements](0203-RemoveLinkedListElements/) |
 | 206 | 反转链表 | 9/8 | 头插法：存后继 → 接结果头 → 前进 O(n) | [0206-ReverseLinkedList](0206-ReverseLinkedList/) |
+| 217 | 存在重复元素 | 9/14 | HashSet：用 `Add` 返回值一步完成「查+登记」，返回 false 即撞重复 O(n) | [0217-ContainsDuplicate](0217-ContainsDuplicate/) |
 | 225 | 用队列实现栈 | 9/11 | 单队列绕圈：新元素入队后老元素"出队即入队"绕一圈顶到队头 O(n)（对照双队列中转版，两种解法都写过） | [0225-ImplementStackUsingQueues](0225-ImplementStackUsingQueues/) |
 | 232 | 用栈实现队列 | 9/10 | 双栈倒手：inStack 管进、outStack 管出；outStack 空时倒手一次，顺序翻转 O(n) 均摊（陷阱：for 条件引用会变的 Count） | [0232-ImplementQueueUsingStacks](0232-ImplementQueueUsingStacks/) |
 | 242 | 有效的字母异位词 | 9/3 | int[26] 计数 +1/-1 全零校验 O(n) | [0242-ValidAnagram](0242-ValidAnagram/) |
@@ -43,6 +44,8 @@
 - [x] 栈与队列入门（09-09 晚提前：20 有效的括号 ✓）
 - [x] 232 用栈实现队列（09-10 ✓——双栈倒手模型）
 - [x] 225 用队列实现栈（09-11 ✓——单队列绕圈 + 双队列中转，两种解法对照）
-- [ ] 回顾错题（09-13 复盘日）
+- [x] 回顾错题（09-13 复盘日：82/232 盲写重做，发现两个记忆盲区 ✓）
+- [x] **哈希表线开启**（09-14 ✓：1 两数之和哈希重写 + 217 存在重复元素）
+- [ ] 383 赎金信 + 349 两个数组的交集（09-15）
 
 > 进阶预告：两数之和的哈希表解法（O(n)）—— 第 5 周学完 Dictionary 后回来优化。

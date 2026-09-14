@@ -9,8 +9,24 @@ monsters.Add(new Monster("巨龙", 120, 18));
 
 Battle.Run(heroes, monsters);
 
+// ── 接口演示：英雄能攻击"任何能挨打的东西"（宝箱根本不是 Character！）──
+Console.WriteLine("\n── 接口演示：攻击宝箱 ──");
+Hero soloHero = new Hero("剑士", 100, 25);
+TreasureChest chest = new TreasureChest(40);
+soloHero.Attack(chest);   // 期望：剑士 攻击 宝箱！/ [宝箱] 受到 30 点伤害，剩余 HP=10
+soloHero.Attack(chest);   // 期望：剑士 攻击 宝箱！/ [宝箱] 受到 30 点伤害，剩余 HP=-20 / [宝箱] 打开了！
+Console.WriteLine($"宝箱状态：{(chest.IsOpened ? "已打开" : "关闭")}");   // 期望：已打开
+
 // ═══════ 类型区 ═══════
-public class Character {
+// 【接口 = 行为契约】"能挨打的东西"——不关心你是什么，只要求你能承受伤害
+//   类比：插座标准（国标三孔）——不管插上来的是什么电器，插头合规就能用
+public interface IAttackable {
+    string Name { get; }          // 契约条款 1：必须有名字
+    bool IsAlive { get; }         // 契约条款 2：必须能报告存活状态
+    void TakeDamage(int dmg);     // 契约条款 3：必须能承受伤害
+}                                  // ← 注意：全是签名，一行实现都没有
+
+public class Character : IAttackable {    // Character 签下"能挨打"的合同
     private static int _totalCount = 0;
     public static int TotalCount => _totalCount;   // 静态统计（Student 类同款）
 
@@ -27,7 +43,8 @@ public class Character {
     }
 
     // 攻击骨架：流程锁死（不 virtual）——先宣告、再算伤害、再结算
-    public void Attack(Character target) {
+    // ★ 参数类型从 Character 换成 IAttackable：从此能攻击"任何能挨打的东西"（角色、宝箱……）
+    public void Attack(IAttackable target) {
         Console.WriteLine($"{Name} 攻击 {target.Name}！");
         target.TakeDamage(CalcDamage());
     }
@@ -78,6 +95,32 @@ public class Monster : Character {
 
     // 不需要改写任何东西——直接继承父类默认行为
     // （体会：不 override = "照着父亲说的做"，这也是多态的一部分）
+}
+
+// 【新类型】宝箱：它【不继承 Character】（没有 MP、不会攻击），但签了 IAttackable 合同 → 也能被攻击
+public class TreasureChest : IAttackable {
+    public string Name => "宝箱";
+    public int HP { get; private set; }
+    public bool IsAlive => HP > 0;
+    public bool IsOpened => !IsAlive;      // 打碎 = 打开
+
+    public TreasureChest(int hp = 40) { HP = hp; }
+
+    // TODO: 实现 TakeDamage——和 Character 的版本像吗？
+    //   · 卫语句同款（dmg <= 0 或已打开 → 直接 return）
+    //   · 否则扣 HP、打印"[宝箱] 受到 dmg 点伤害，剩余 HP=xx"
+    //   · ★ 但"归零"时的措辞不同：宝箱不说"倒下了"，而说"[宝箱] 打开了！"
+    //     —— 同一个契约，各自实现细节不同，这正是接口的价值
+    public void TakeDamage(int dmg) {
+        if(dmg <= 0 || IsOpened) return;
+        HP -= dmg;
+        if (IsOpened)
+        {
+            Console.WriteLine("[宝箱] 打开了！");
+            return;
+        }
+        Console.WriteLine($"[宝箱] 受到 {dmg} 点伤害，剩余 HP={HP}");
+    }
 }
 
 public class Battle {
