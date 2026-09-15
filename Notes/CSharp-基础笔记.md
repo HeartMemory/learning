@@ -241,6 +241,18 @@ cur = cur.next;                     // 【换地址】，不是"把对象改成�
 **封装三件套（完整闭环）**：`private` 字段（藏起来）→ 属性门卫（校验）→ `IReadOnlyList` 只读眼镜（受控暴露）。
 口诀：**字段藏起来、门卫站好岗、窗开多小自己定**。
 
+**完整属性 vs 自动属性（09-15 澄清）**：
+
+| | 完整属性（手写方法体） | 自动属性 `{ get; set; }` |
+|---|---|---|
+| 数据存在哪 | **你自己声明的 `_age`** | **编译器生成的隐藏字段**（没有名字可访问） |
+| Age ↔ 字段的关联 | **你手写** `get { return _age; }` 才建立 | 编译器自建，**与你的 `_age` 毫无关系** |
+| 能有校验逻辑吗 | ✅ | ❌ |
+
+⚠️ **不能混用**：同时写 `private int _age;` 和 `public int Age { get; set; }` → **两份独立数据、互不同步**（经典 bug：`s.Age = 20` 后 `_age` 还是老值）
+⚠️ **`readonly` 不能修饰访问器**（`{ get; private readonly set; }` 是非法语法）；属性层的“只读”靠**不写 set**（字段层才用 `readonly`）
+⚠️ **`private set`（控制“谁能改”）与“不写 set / readonly”（控制“能不能改”）是两件事**
+
 - 只读眼镜：外部能 `Count`、能索引，**不能 `Add`**（编译错误 CS1061）——`List<string>` 只交出 `IReadOnlyList<string>` 视图
 - 静态校验源（DRY）：`public static bool IsValidAge(int age) => age >= MinAge && age <= MaxAge;`——set 和构造函数共用，规则只写一处
 
@@ -363,6 +375,8 @@ private static Character? FindFirstAlive(...)   // ? = “我可能返回空”
 | `Queue<T>`（排队，FIFO） | `Enqueue(x)` | `Dequeue()` | `Peek()` | 同上 |
 | `List<T>` | `Add(x)` | `Remove(x)` / `RemoveAt(i)` | `list[i]` | `Count` / `Contains` |
 | `IReadOnlyList<T>` | ❌ | ❌ | `list[i]` | `Count`（只读眼镜） |
+| `HashSet<T>`（去重集合） | `Add(x)`（**返回 bool**） | `Remove(x)` | `Contains(x)` | `Count` / 集合运算 `IntersectWith` 等（详见第 23 章） |
+| `Dictionary<K,V>`（键值映射） | `dict[k] = v` | `Remove(k)` | `dict[k]` / `TryGetValue` | `ContainsKey` / `Keys` / `Values`（详见第 23 章） |
 
 - **空栈/空队列上 `Pop`/`Dequeue`/`Peek` 直接抛异常**——动手前先看 `Count`
 - `Count` 是**属性**（无括号），`Contains()` 是**方法**（有括号）
@@ -444,6 +458,154 @@ public abstract class Shape : IDrawable {
     public abstract void Draw();     // 签了契约但不实现 → 子类必须实现（编译强制）
 }
 ```
+
+## 23. 哈希表：HashSet 与 Dictionary（09-14）
+
+**核心思想**：**用「算下标」换「免遍历」**——哈希函数把 key 换算成数组下标，查找时直接跳过去（平均 O(1)）。
+
+| 容器 | 存什么 | 典型用途 |
+|---|---|---|
+| `HashSet<T>` | 只有**键** | 判重 / 存在性判断 |
+| `Dictionary<K,V>` | **键 → 值** | 建立映射（数字→下标、字符→次数…）|
+
+> 两者**底层几乎同一套实现**（同一个哈希表），Dictionary 只是条目里多存了一个 Value。
+
+### HashSet\<T\> API
+
+| 成员 | 作用 |
+|---|---|
+| `Add(x)` | 加入；**返回 bool：新增 true / 已存在 false** ⭐ |
+| `Contains(x)` | 是否存在（O(1)）|
+| `Remove(x)` / `Clear()` | 删除 / 清空 |
+| `Count` | 元素个数（重复 Add 不增加）|
+| `IntersectWith(other)` | **原地**保留交集 |
+| `UnionWith(other)` | **原地**变并集 |
+| `ExceptWith(other)` | **原地**变差集（我有你没有）|
+| `ToArray()` | 转成数组 |
+
+- **自动去重**、**无序**（遍历顺序 ≠ 插入顺序，需要保序就别用它）
+- `Add` 的返回值 = **一次调用同时完成“查 + 登记”**（217 题的正解钥匙）
+
+### Dictionary\<K,V\> API
+
+| 成员 | 作用 | key 不存在时 |
+|---|---|---|
+| `dict[k]` | 取值 | **抛 KeyNotFoundException** |
+| `dict[k] = v` | 存值（新增或覆盖）| 直接新增 |
+| `Add(k, v)` | 严格新增 | **抛 ArgumentException** |
+| `TryGetValue(k, out v)` | **安全取值** ⭐ | 返回 false，v = 类型默认值 |
+| `ContainsKey(k)` | 是否存在 | 返回 false（O(1)）|
+| `ContainsValue(v)` | 是否存在某个值 | O(n) 遍历（少用）|
+| `Remove(k)` / `Count` | 删除 / 个数 | — |
+| `Keys` / `Values` | 键集合 / 值集合 | — |
+
+**TryGetValue vs ContainsKey + `dict[k]`**：前者**一次哈希查找**（同时回答“在不在”+“值是多少”），后者要查**两遍**。
+→ **既要判断又要取值时，永远优先 `TryGetValue`**。
+
+**键值设计方法论**：**“按什么查”决定“什么当 key”**。
+（要向数字查询它的下标 → 数字当 key、下标当 value；把下标当 key 就永远查不到。）
+
+### 计数模式（词频统计）
+
+```csharp
+Dictionary<string, int> freq = new Dictionary<string, int>();
+foreach (string w in words) {
+    freq.TryGetValue(w, out int n);    // 不存在 → n = 默认值 0
+    freq[w] = n + 1;                   // 一行同时兼容"首次出现"和"再次出现"
+}
+// 更简洁：freq[w] = freq.GetValueOrDefault(w) + 1;
+```
+
+- `dict[c]++` **不能直接用**——key 不存在时“读”这一步就抛异常
+- 数组计数天然免疫：**数组所有下标一开始就存在（值为 0）**，Dictionary 的坑位是按需新建的
+
+### 数组 vs Dictionary（特化 vs 通用）
+
+| 场景 | 选择 | 原因 |
+|---|---|---|
+| key 是连续小整数（如 `c - 'a'` 的 0~25）| **`int[26]`** | 连哈希函数都省了（key 直接当数组下标）——最快最省 |
+| key 不连续 / 类型多样 | **Dictionary** | 通用；稍慢一点 |
+
+> `int[26]` 本质就是**“特化的哈希表”**——用特化换性能，代价是只适用于特定 key 范围。
+
+### 底层原理（面试要点）
+
+- **结构**：`_buckets`（桶数组，存条目编号）+ `_entries`（条目数组，每条含 `HashCode` / `Next` / `Value`）
+- **定位**：`hashCode % 桶数量`；**桶数量取质数**——若表长是 2 的幂，取模等价于“只看哈希低位”，低位一旦有规律就全部扎堆
+- **冲突**：链地址法（同桶靠 `Entry.Next` 串成链）
+- **比较顺序**：先比缓存的 `HashCode`（int 比较，便宜）→ 相等才调 `Equals`（贵）→ 用便宜的比较筛掉绝大多数候选
+- **扩容**：满了 → 换成下一个质数（约 2 倍）→ 全部元素 rehash；所以是**平均** O(1) 而非绝对
+- `Entry` 是内部私有 struct（值类型、连续内存、无对象头）——**实现细节，不必背**
+
+**自定义类型当 key**：必须重写 `GetHashCode()` + `Equals()`，并遵守契约——
+**`Equals(a,b) == true` → 两者哈希值必须相等**（违反会导致“放进去了却找不到”）。
+
+**运行时多态的底层（补充）**：每个类型有一张**虚方法表（vtable）**，对象头部存着**类型指针**；调用 virtual 方法时顺指针找到真实类型表 → 查表拿到实际地址 → 跳转执行。由此推出：非虚调用更快（编译期焊死）、静态方法不能 virtual（没有对象就没有类型指针）、接口调用多一层查找（略慢于虚方法）。
+
+### out 参数机制（Try 系 API 的通用形态）
+
+- 本质：**传变量的地址**，方法往你的变量里写 → 所以能“带出来”
+- **不要求初始化**；方法必须在**所有路径**上赋值；方法返回前不能读（编译器保证读不到垃圾值）
+- 记忆：**`out` 是“递个空碗出去接”，`new` 是“自己捏一个碗”**（方向相反）
+
+## 24. 抽象类 abstract（09-15）
+
+```csharp
+public abstract class Character {            // ① 类加 abstract → 不能 new（CS0144）
+    public string Name { get; }              // 可以有字段/属性（接口做不到）
+    public Character(string name) { ... }    // 可以有构造函数
+
+    public void Attack(...) { ... }          // 可以有【已实现】的方法
+
+    protected abstract int CalcDamage();     // ② 也可以有【只有签名】的成员 → 子类必须 override（CS0534）
+}
+```
+
+**两条铁律**：
+
+| 规则 | 原因 |
+|---|---|
+| `abstract` 成员只能住在 `abstract` 类里 | 图纸不完整就不能造东西 |
+| `abstract` 成员不能 `private` / `static`，且**隐含 virtual** | private 子类看不见没法改；static 没有对象没有多态；隐含 virtual 所以不能写 `abstract virtual` |
+
+### 三方对比（今天的核心）
+
+| | `interface` | `virtual` | `abstract` |
+|---|---|---|---|
+| 有实现吗 | ❌（C#8 可有默认实现） | ✅ **有**（默认实现） | ❌ **没有** |
+| 子类必须实现吗 | ✅ 提供手段不限（**继承来的也算**） | ❌ 可选改写 | ✅ **必须亲手 override** |
+| 关系 | can-do（跨家族） | is-a（可改写点） | is-a（必填空缺） |
+| 一句话 | “你得会”（提供即可） | “你可以改” | “你必须补” |
+
+### 接口 vs 抽象类
+
+| | 接口 | 抽象类 |
+|---|---|---|
+| 内容 | 只有签名 | 签名 + 实现 + 字段 + 构造函数 |
+| 实例化 | ❌ | ❌（但子类可以） |
+| 数量 | 一个类可实现**多个** | 只能继承**一个** |
+| 主要用途 | 定义能力契约、**解耦** | **半成品基类**：共享实现 + 强制填空 |
+| 组合用法 | —— | **抽象类实现接口**（骨架类，框架常用） |
+
+### 什么时候用（判断标准）
+
+- 只定义“能做什么”、要解耦、要跨继承体系组合 → **接口**
+- 共享实现代码 + 强制子类填某些空 + 是同类事物 → **抽象类**
+- **抽象层次要匹配真实差异**：如果所有子类实现都一样，就该把实现放父类（`abstract` 退位成普通方法）——否则只会得到重复代码（**避免过度设计 / YAGNI**）
+
+### 实战案例：CharacterBattle 的四步重构（可复用方法论）
+
+```
+① if (Name == "剑士") ...                  用数据判断类型 ❌
+② 参数化：技能名/加成作构造参数              数据做计算输入 ✅
+③ 上提父类：公共字段 + 统一 CalcDamage       规则只写一处（DRY）
+④ abstract 退位：CalcDamage 改回普通方法     抽象层次匹配真实差异
+```
+
+**配套工程习惯**：
+- **重构 ≠ 增强**：重构要求“行为不变”，增强是“行为改变”——**分开提交**（出 bug 时才定位得到）
+- 验证重构成功的标准：**输出与改造前完全一致**
+- 看历史版本用 `git diff` / `git show`，不要在文件里堆旧代码
 
 ## 📌 回访清单（学到对应内容时回来重构）
 
