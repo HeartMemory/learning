@@ -1,17 +1,17 @@
 ﻿// ═══════ 战斗场景（测试区）═══════
 List<Character> heroes = new List<Character>();
-heroes.Add(new Hero("剑士", 100, 25));
-heroes.Add(new Hero("法师", 80, 30));
+heroes.Add(new Hero("剑士", 100, 25, "剑技", 5));
+heroes.Add(new Hero("法师", 80, 30, "法技", 10));
 
 List<Character> monsters = new List<Character>();
-monsters.Add(new Monster("史莱姆", 40, 8));
-monsters.Add(new Monster("巨龙", 120, 18));
+monsters.Add(new Monster("史莱姆", 40, 8, "撕咬", 5));
+monsters.Add(new Monster("巨龙", 120, 18, "吐息", 10));
 
 Battle.Run(heroes, monsters);
 
 // ── 接口演示：英雄能攻击"任何能挨打的东西"（宝箱根本不是 Character！）──
 Console.WriteLine("\n── 接口演示：攻击宝箱 ──");
-Hero soloHero = new Hero("剑士", 100, 25);
+Hero soloHero = new Hero("剑士", 100, 25, "剑技", 5);
 TreasureChest chest = new TreasureChest(40);
 soloHero.Attack(chest);   // 期望：剑士 攻击 宝箱！/ [宝箱] 受到 30 点伤害，剩余 HP=10
 soloHero.Attack(chest);   // 期望：剑士 攻击 宝箱！/ [宝箱] 受到 30 点伤害，剩余 HP=-20 / [宝箱] 打开了！
@@ -26,7 +26,9 @@ public interface IAttackable {
     void TakeDamage(int dmg);     // 契约条款 3：必须能承受伤害
 }                                  // ← 注意：全是签名，一行实现都没有
 
-public class Character : IAttackable {    // Character 签下"能挨打"的合同
+public abstract class Character : IAttackable {    // Character 签下"能挨打"的合同
+    private readonly string _skillName;
+    private readonly int _skillBonus;
     private static int _totalCount = 0;
     public static int TotalCount => _totalCount;   // 静态统计（Student 类同款）
 
@@ -35,10 +37,12 @@ public class Character : IAttackable {    // Character 签下"能挨打"的合�
     public int AttackPower { get; }
     public bool IsAlive => HP > 0;                 // 计算属性
 
-    public Character(string name, int hp, int attackPower) {
+    public Character(string name, int hp, int attackPower, string skillName, int skillBonus) {
         Name = name;
         HP = hp;
         AttackPower = attackPower;
+        _skillName = skillName;
+        _skillBonus = skillBonus;
         _totalCount++;
     }
 
@@ -50,7 +54,11 @@ public class Character : IAttackable {    // Character 签下"能挨打"的合�
     }
 
     // 伤害钩子：默认返回攻击力，子类可改写（Hero 的剑技加成）
-    protected virtual int CalcDamage() => AttackPower;
+    protected int CalcDamage()
+    {
+        Console.WriteLine($"[{Name}] 使出{_skillName}！");
+        return AttackPower + _skillBonus;
+    }
 
     // TODO 1：受伤结算——卫语句（dmg <= 0 或 已阵亡 → 直接 return）
     //         否则：HP 扣 dmg，打印"[Name] 受到 dmg 点伤害，剩余 HP=xx"
@@ -65,34 +73,17 @@ public class Character : IAttackable {    // Character 签下"能挨打"的合�
 
 public class Hero : Character {
     public int MP { get; private set; }
-
-    public Hero(string name, int hp, int attackPower) : base(name, hp, attackPower) {
+    public Hero(string name, int hp, int attackPower, string skillName, int skillBonus) : base(name, hp, attackPower, skillName, skillBonus) {
         MP = 50;
     }
 
     // TODO 2：override 改写伤害钩子——英雄有剑技加成：
     //         打印"[Name] 使出剑技！"，然后返回 AttackPower + 5
     //         （体会：父类骨架一行都没动，只是换了"伤害怎么算"这一步）
-    protected override int CalcDamage()
-    {
-        int dmg = base.CalcDamage();
-        if(Name == "剑士")
-        {
-            Console.WriteLine($"[{Name}] 使出剑技！");
-            dmg += 5;
-        }
-        if(Name == "法师")
-        {
-            Console.WriteLine($"[{Name}] 使出法技！");
-            dmg += 10;
-        }
-        return dmg;
-    }
 }
 
 public class Monster : Character {
-    public Monster(string name, int hp, int attackPower) : base(name, hp, attackPower) { }
-
+    public Monster(string name, int hp, int attackPower, string skillName, int skillBonus) : base(name, hp, attackPower, skillName, skillBonus){}
     // 不需要改写任何东西——直接继承父类默认行为
     // （体会：不 override = "照着父亲说的做"，这也是多态的一部分）
 }
