@@ -354,6 +354,45 @@ private static Character? FindFirstAlive(...)   // ? = “我可能返回空”
 - 加了 `?` 后，调用处直接 `.HP` 会得到**编译警告**（“解引用可能为 null”）——编译器替你在每个调用点站岗
 - 返回值类型声明为 `Character`（承诺非空）却返回 null → **CS8603 警告**：承诺与实现不一致
 
+### ⚠️ CS8632：`?` 什么时候会**失效**（09-16 补）
+
+`?` 是**开关特性**——需要项目打开"可空上下文"才生效：
+
+```xml
+<Nullable>enable</Nullable>     <!-- 写在 .csproj 里 -->
+```
+
+| 上下文 | `?` 的表现 |
+|---|---|
+| **开着**（`enable`） | 正常站岗：CS8602（调用点不判空）/ CS8603（承诺非空却返回 null） |
+| **关着**（默认） | **CS8632 警告**：「可空引用类型的注释应仅用于 `#nullable` 上下文内」→ **`?` 被当成不存在**，所有站岗失效 |
+
+**运行时真相**：`Character?` 和 `Character` 在 IL 里**是同一个类型**，`?` 只是编译期的**便签**。所以"去掉问号"**不改变任何行为**，绝对安全（只是丢掉了"可能为 null"这句文档信息）。
+
+**环境差异（09-16 实测）**：
+
+| | `dotnet` 项目 | Unity 脚本程序集 |
+|---|---|---|
+| `<Nullable>` | `enable` ✅ | **没有** ❌ |
+| `<ImplicitUsings>` | `enable` ✅ | **没有** ❌ |
+
+> 这两个开关**并排躺在同一个 `<PropertyGroup>` 里** —— Unity 一个都没开。所以"`List<>` 要手写 using"和"`?` 变警告"**同源同因**：**Unity 拿到的是一份没开任何 C# 现代特性的项目文件。**
+
+**三种修法**：
+1. **开上下文**（最正确）：文件顶部 `#nullable enable`，或建 `Assets/csc.rsp` 写 `-nullable:enable`（`csc.rsp` = 传给 C# 编译器的额外参数）
+2. **去掉 `?`**（省事）：行为不变，丢文档信息
+3. **无视**（❌）：警告列表被污染，真问题会被淹没
+
+**值类型的 `?` 和引用类型的 `?` 根本不是一回事**：
+
+| | `int?` | `Character?` |
+|---|---|---|
+| 运行时实体 | **`Nullable<int>` 结构体**（`HasValue` + `Value`） | **没有**，就是 `Character` |
+| 本质 | 给"不能为空"的类型**开后门** | 给"本来就能为空"的类型**贴标签** |
+| 差异体现在 | **运行时结构**变了 | **只在编译期警告** |
+
+**背景**：引用类型默认可 null 被称为"**十亿美元错误**"（null 的发明者 Tony Hoare 自己承认）；NRT 就是把 NRE 从"**运行时爆炸**"提前到"**编译时警告**"—— **但前提是开关打开**。联想 09-12 在 `CharacterBattle` 撞的那个 NRE：如果当时有标注且开关打开，编译器当场就拦住了。
+
 ## 19. 控制流层级：return / break / continue（09-12）
 
 | 关键词 | 结束谁 | 影响 |
@@ -616,7 +655,7 @@ public abstract class Character {            // ① 类加 abstract → 不能 n
 | 1 | **入口点** | 支持**顶级语句**（文件顶层直接写代码） | ❌ 报 **CS8805**（程序集是 DLL，没有入口）→ 代码必须进方法 |
 | 2 | **隐式 using** | `.csproj` 有 `<ImplicitUsings>enable</ImplicitUsings>`，`List<>`/`Console` 自动可用 | ❌ 老式 csproj，**必须手写** `using System.Collections.Generic;` → 否则 **CS0246** |
 | 3 | **输出目标** | `Console.WriteLine` → 终端 | ⚠️ 能编译，但只写进 `Editor.log`，**不显示在控制台窗口** → 必须用 `Debug.Log` |
-| 4 | **可空上下文** | 可开 `<Nullable>enable</Nullable>` | ❌ 默认关闭，`Character?` 报 **CS8632**（警告）→ 去掉 `?` |
+| 4 | **可空上下文** | 可开 `<Nullable>enable</Nullable>` | ❌ 默认关闭，`Character?` 报 **CS8632**（警告）→ 去掉 `?`（**原理详见第 18 章「CS8632」**） |
 
 > 🔑 **迁移检查清单**（任何 C# 代码搬进 Unity，先过这四项）：顶级语句？using 齐吗？`Console` 换 `Debug.Log` 了吗？可空问号？
 
