@@ -3,7 +3,7 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（23 题）
+## 简单（25 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
@@ -18,6 +18,7 @@
 | 121 | 买卖股票的最佳时机 | 8/29 | 单向遍历 + 历史最低价 O(n)（[错题本01](../Notes/错题本.md)） | [0121-BestTimeToBuyAndSellStock](0121-BestTimeToBuyAndSellStock/) |
 | 125 | 验证回文串 | 9/3 | IsLetterOrDigit 过滤 + ToLower + 双指针 | [0125-ValidPalindrome](0125-ValidPalindrome/) |
 | 141 | 环形链表 | 9/8 | 快慢指针判圈（Floyd）O(n) 时间 O(1) 空间 | [0141-LinkedListCycle](0141-LinkedListCycle/) |
+| 202 | 快乐数 | 9/16 | HashSet 判环：每步平方和登记，`Add` 返回 false 即回到老路 O(log n)（踩坑见[错题本](../Notes/错题本.md)） | [0202-HappyNumber](0202-HappyNumber/) |
 | 203 | 移除链表元素 | 9/7 | 哑节点 + tail 原地拼接，断悬尾 O(n) | [0203-RemoveLinkedListElements](0203-RemoveLinkedListElements/) |
 | 206 | 反转链表 | 9/8 | 头插法：存后继 → 接结果头 → 前进 O(n) | [0206-ReverseLinkedList](0206-ReverseLinkedList/) |
 | 217 | 存在重复元素 | 9/14 | HashSet：用 `Add` 返回值一步完成「查+登记」，返回 false 即撞重复 O(n) | [0217-ContainsDuplicate](0217-ContainsDuplicate/) |
@@ -28,6 +29,7 @@
 | 344 | 反转字符串 | 9/3 | 双指针原地交换 O(n) | [0344-ReverseString](0344-ReverseString/) |
 | 349 | 两个数组的交集 | 9/15 | HashSet 双版本：手动 `Contains` 收集 vs `IntersectWith` 集合运算 O(n)（后者原地修改、返回 void） | [0349-IntersectionOfTwoArrays](0349-IntersectionOfTwoArrays/) |
 | 383 | 赎金信 | 9/15 | 字符计数消耗：`TryGetValue` 默认值 0 让「不存在」与「配额用完」共用一条判断 O(n) | [0383-RansomNote](0383-RansomNote/) |
+| 387 | 字符串中的第一个唯一字符 | 9/16 | 两趟：Dictionary 计数 + 再扫首个计数为 1 的下标 O(n)（对比 `int[26]` 特化哈希表） | [0387-FirstUniqueCharacter](0387-FirstUniqueCharacter/) |
 | 389 | 找不同 | 9/4 | 全字符异或，成对抵消 O(n) 时间 O(1) 空间 | [0389-FindTheDifference](0389-FindTheDifference/) |
 | 485 | 最大连续 1 的个数 | 8/28 | 一次遍历 + 计数器 O(n) | [0485-MaxConsecutiveOnes](0485-MaxConsecutiveOnes/) |
 
@@ -49,6 +51,6 @@
 - [x] 回顾错题（09-13 复盘日：82/232 盲写重做，发现两个记忆盲区 ✓）
 - [x] **哈希表线开启**（09-14 ✓：1 两数之和哈希重写 + 217 存在重复元素）
 - [x] 383 赎金信 + 349 两个数组的交集（09-15 ✓）
-- [ ] 哈希表继续：202 快乐数 / 387 第一个唯一字符（09-16 起）
+- [x] 202 快乐数 + 387 第一个唯一字符（09-16 ✓——哈希表线：判环 + 计数两趟）
 
 > 进阶预告：两数之和的哈希表解法（O(n)）—— 第 5 周学完 Dictionary 后回来优化。
