@@ -607,6 +607,123 @@ public abstract class Character {            // ① 类加 abstract → 不能 n
 - 验证重构成功的标准：**输出与改造前完全一致**
 - 看历史版本用 `git diff` / `git show`，不要在文件里堆旧代码
 
+## 25. Unity 脚本基础与生命周期（09-16）
+
+### 一、从 .NET 控制台到 Unity：4 个环境差异（同一份 C# 代码会"炸"的原因）
+
+| # | 差异 | 控制台项目（dotnet） | Unity 脚本程序集 |
+|---|---|---|---|
+| 1 | **入口点** | 支持**顶级语句**（文件顶层直接写代码） | ❌ 报 **CS8805**（程序集是 DLL，没有入口）→ 代码必须进方法 |
+| 2 | **隐式 using** | `.csproj` 有 `<ImplicitUsings>enable</ImplicitUsings>`，`List<>`/`Console` 自动可用 | ❌ 老式 csproj，**必须手写** `using System.Collections.Generic;` → 否则 **CS0246** |
+| 3 | **输出目标** | `Console.WriteLine` → 终端 | ⚠️ 能编译，但只写进 `Editor.log`，**不显示在控制台窗口** → 必须用 `Debug.Log` |
+| 4 | **可空上下文** | 可开 `<Nullable>enable</Nullable>` | ❌ 默认关闭，`Character?` 报 **CS8632**（警告）→ 去掉 `?` |
+
+> 🔑 **迁移检查清单**（任何 C# 代码搬进 Unity，先过这四项）：顶级语句？using 齐吗？`Console` 换 `Debug.Log` 了吗？可空问号？
+
+### 二、MonoBehaviour = "能被挂到 GameObject 上的组件"
+
+```csharp
+public class LifecycleDemo : MonoBehaviour   // 继承 MonoBehaviour = "我是一个组件"
+```
+
+- **写类 ≠ 有对象**：脚本文件建好了但**没挂到任何 GameObject 上 → 一行都不会执行**（引擎只对场景中的**组件实例**点名）。这就是"播放后控制台一片空白"的头号原因
+- 硬约束：**一个 `.cs` 文件最多一个 `MonoBehaviour`，且文件名必须 = 类名**；**普通类 / 接口不受此限**（一个文件可装任意多个，文件名随便叫）
+- 同一个 GameObject 可以挂**多个相同组件**（要禁止得在类上加 `[DisallowMultipleComponent]`）——排查"改了脚本没反应"时先看一眼是不是挂了两个
+
+### 三、生命周期回调（引擎按名字点名）
+
+```
+Awake → OnEnable → Start → (每帧: Update → LateUpdate) → OnDisable → OnDestroy
+```
+
+| 回调 | 触发时机 | 次数 |
+|---|---|---|
+| `Awake` | 实例被加载（物体激活时） | **一生一次** |
+| `OnEnable` | 物体**且**组件都启用时 | **每次进出都触发** |
+| `Start` | 第一次启用后、第一帧 `Update` 前 | **一生一次** |
+| `Update` | 每帧 | 每帧 |
+| `LateUpdate` | 本帧所有 `Update` 跑完后 | 每帧 |
+| `OnDisable` | 物体**或**组件被禁用 / 销毁前 | **每次进出都触发** |
+| `OnDestroy` | 实例被销毁 | 一生一次 |
+
+**三条关键结论**：
+1. `Awake` → `OnEnable` → `Start`；**`Awake`/`Start` 的"一次"指"这个实例的一生"**，重新启用**不会**重跑
+2. **`Update` 频率不是固定 60**：编辑器空场景可跑上千帧/秒（没开垂直同步）→ **任何速度/时间逻辑必须乘 `Time.deltaTime`**（帧率无关性铁律）
+3. **`LateUpdate` 存在的理由**：多个组件之间 `Update` 的**执行顺序不保证** → 相机跟随必须放 `LateUpdate`，才能拿到所有物体本帧的**最终位置**（否则画面抖动）
+
+### 四、⭐ 按名字点名 vs vtable（两种调用机制对照）
+
+| | `virtual` / `override` | Unity 生命周期（消息机制） |
+|---|---|---|
+| 谁决定被调用 | **编译器**（编译期焊进 vtable） | **引擎**（运行时扫描方法名，结果缓存成"消息表"） |
+| 定位方式 | 类型指针 → 虚方法表 → 跳转 | 按**名字**匹配 |
+| 写错了 | **编译报错** | **不报错，静默失效**（`void update()` 永远不跑） |
+| 访问修饰符 | 只能 `public`/`protected` | **随便**（`private` 也能被调） |
+| 类比 | 填表格（格子印好了，每格都要处理） | 喊名字（答应哪个干哪个，没人应也没人管） |
+
+**Unity 为什么选"点名"**：① **`private` 也能被调用**（`void Start()` 就是隐式私有，这在 virtual 体系里做不到）；② **不依赖继承体系**（ScriptableObject、编辑器脚本也能接回调）；③ 多语言兼容（早期支持 JS/Boo）；④ 想用哪个写哪个，新增回调不用改基类。
+**代价**：没有编译期保护 → **生命周期方法永远用 IDE 补全，绝不手打**。
+
+> 注意：`virtual` 只是"**可以**改写"，不是"必须"（必须的是 `abstract`）。`Monster` 没 override 就用父类默认实现 ✓
+
+### 五、组件禁用 vs 物体禁用（两个长得几乎一样的 checkbox）
+
+| | 组件勾选框（`enabled`） | 物体勾选框（`activeSelf` / `SetActive`） |
+|---|---|---|
+| 影响范围 | **只有这一个组件** | **物体上所有组件** |
+| 子物体 | 不受影响 | **全部一起失活** |
+| 层级窗口 | 物体**不变灰** | 物体名**变灰** |
+
+**关键洞察（实测得出）**：**从脚本自身看，两种情况收到的回调一模一样（`OnDisable` / `OnEnable`）**——脚本根本分不清"我被禁用了"还是"我所在的物体被禁用了"。唯一区别在**影响范围**。
+（实锤实验：一个物体挂两个相同组件，勾选的跑完整流程，未勾选的一条日志都没有。）
+
+### 六、场景心智模型
+
+- **你运行的不是"某个脚本"，而是"整个场景"**：播放时场景里**所有物体同时活着、同时运行**（所以会莫名多出别的脚本的日志）
+- 场景会"记住"你放进去的一切（`Ctrl+S` 保存 `.unity` 文件）；**代码保存（VS 的 `Ctrl+S`）和场景保存是两件独立的事**
+
+### 七、两个必踩的工程坑
+
+| 坑 | 现象 | 原因 / 修法 |
+|---|---|---|
+| **编码** | VS 弹"某些 Unicode 字符未能保存到当前代码页" | 脚本里有中文/emoji，VS 默认 ANSI/GBK 存不下 → **点"是"存 UTF-8**（Unity 按 UTF-8 解析 `.cs`），勾选"应用到所有文档" |
+| **粘贴括号层级** | `CS1513: } expected` + `CS1022: Type or namespace definition...` | 粘贴时**忘闭合方法体** → 后面的类型声明被"吸"进方法里。**看见括号类报错先数括号**（VS 光标放 `{` 上可高亮配对，`Ctrl+]` 跳转），别盯代码内容 |
+
+### 八、接口回收：`IEnumerable<T>` / `IList<T>` / `IDictionary<K,V>` / `KeyValuePair<K,V>`
+
+**和你自写的 `IAttackable` 是同一种东西**，区别只在"谁写的 + **消费者是谁**"：
+
+| 接口 | 契约内容 | **消费者（谁在认它）** | 你的使用痕迹 |
+|---|---|---|---|
+| `IAttackable` | `Name` / `IsAlive` / `TakeDamage` | 你写的 `Character.Attack()` | 09-14 |
+| `IEnumerable<T>` | "我能被逐个遍历" | **`foreach` 关键字本身** | 从第一天起每条 `foreach` |
+| `IList<T>` | "能按下标访问 + Add + Count" | `[]` 索引器、`Add` | 118 杨辉三角（`IList<IList<int>>`） |
+| `IReadOnlyList<T>` | "能下标、不能改" | 只读访问 | 09-08 Encapsulation |
+| `IDictionary<K,V>` | "能用 key 查 value" | `dict[key]`、`TryGetValue` | 09-14 起 |
+| `KeyValuePair<K,V>` | "一对 (key, value)" | 遍历 Dictionary 时 | ❌ 还没用过 |
+
+**继承层次（越往下能力越多）**：
+
+```
+IEnumerable<T>            ← 能被 foreach（最底层能力）
+├── ICollection<T>        ← 能 Count / Add / Remove
+│   ├── IList<T>          ← 能按下标 list[0]
+│   └── IDictionary<K,V>  ← 能用 key 查 value
+└── IReadOnlyList<T>      ← 只读版：能下标、不能改
+```
+
+- **铁律：接口必须有"另一端"（消费者）才有意义** —— 没有消费者的接口是废纸。判断任何接口先问：**谁在认这份契约？**
+- 预告：`IComparable<T>`（消费者 `List.Sort()`）、`IDisposable`（消费者 `using`）、`IEquatable<T>`（消费者 `Dictionary`/`HashSet` 判重）—— 全是同一套逻辑
+- **选用原则：自己内部用 → 选实现（`List<T>`）；给别人用 → 选接口（`IReadOnlyList<T>` / `IEnumerable<T>`）**
+
+### 九、`using` 的机制（易误解点）
+
+- `using X;` **不是"引入"什么**，它只是把 X 命名空间里的类型名加进**检索范围**（短名 → 全名的查找表）
+- 类型的**全名**永远是 `命名空间.类型名`（如 `UnityEngine.Debug`）；`using` 只让你能写短名。联想：`using` ≈ 把目录加进 `PATH`
+- `System.Collections.Generic` 读作**路径**：`System` → `Collections`（老式非泛型 `ArrayList`/`Hashtable`，存 `object` 要装箱）→ `Generic`（泛型版，类型安全 + 免装箱）
+- 两个 `Debug` 会打架：`UnityEngine.Debug`（控制台输出）vs `System.Diagnostics.Debug`（诊断）—— 同时 using 会报 **CS0104 不明确的引用**，届时只能写全名
+- **万能判定法：删掉这个 `using`，编译一次，看哪儿报红。** 不报红 = 没用（VS 也会显示成灰色）
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`ReadNumber`（CalculatorV2）**：现在输入流结束（null）时只能返回 0 凑合——学到**异常处理**后，改成把「无输入」上抛给主循环统一处理的正规写法（2026-09-02 记）
@@ -615,4 +732,7 @@ public abstract class Character {            // ① 类加 abstract → 不能 n
 - [ ] **Dictionary 已学（09-14）**：`CharacterBattle` 的 `if (Name == "剑士")` 分支 → 用参数化或 Dictionary 查表重构（可安排到 09-20 复盘日，2026-09-09/09-12 记）
 - [ ] **HashSet 已学（09-14）**：141 环形链表补一个哈希集合解法对比（可安排到 09-20 复盘日，2026-09-08 记）
 - [ ] 学完**异常处理**后：Student 属性的「丢弃策略」（非法值静默 return）升级为抛异常（2026-09-08 记）
-- [ ] 学完 **Unity** 后：把 `CharacterBattle` 的类结构（Character/Hero/Monster + 钩子）搬到 Unity 角色系统（2026-09-12 记）
+- [x] ~~学完 **Unity** 后：把 `CharacterBattle` 的类结构搬到 Unity 角色系统~~（**09-16 完成 ✓**：`CharacterClasses.cs` + `BattleDemo.cs` 跑通全流程，4 个环境坑已踩）
+- [ ] **接口三件套未回收（09-16 记）**：把 `Battle.Run` 的参数从 `List<Character>` 换成 `IEnumerable<Character>` 版本，体会"给别人用就选接口"（顺带：`foreach` 认的就是它）
+- [ ] **`KeyValuePair` 未回收（09-16 记）**：亲手遍历一次 `Dictionary<char,int>`（用 `kv.Key` / `kv.Value`），顺手验证"遍历中不能修改字典"的坑
+- [ ] 学完 **prefab / 对象池**后：`Battle.Run` 里 `new Hero(...)` 的写法换成 Unity 的 `Instantiate`（09-22 打砖块时自然撞上）
