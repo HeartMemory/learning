@@ -763,6 +763,194 @@ IEnumerable<T>            ← 能被 foreach（最底层能力）
 - 两个 `Debug` 会打架：`UnityEngine.Debug`（控制台输出）vs `System.Diagnostics.Debug`（诊断）—— 同时 using 会报 **CS0104 不明确的引用**，届时只能写全名
 - **万能判定法：删掉这个 `using`，编译一次，看哪儿报红。** 不报红 = 没用（VS 也会显示成灰色）
 
+## 26. Unity 空间与运动（09-17）
+
+### 三件套的关系
+
+```
+GameObject  = 空容器（本身什么都不会）
+Component   = 装在容器里的功能件（行为 / 数据 / 外观）
+Transform   = 唯一【强制】自带的组件（删不掉）
+```
+
+- **Unity 里没有"物体的行为"，只有"组件的行为"**：想移动 → 挂脚本组件；想碰撞 → Collider；想被看见 → 渲染组件
+- **`transform` 不是全局变量**，是**继承自 `Component` 的属性**（≡ `this.transform`）
+  - `: MonoBehaviour` 的真正价值 = 白送一批快捷访问（`transform`/`gameObject`/`name`/`enabled`）+ 生命周期方法的"报名资格"
+- **Scene 窗口 = 上帝视角**（右键环视、右键+WASD 飞行、滚轮缩放、选中按 `F` 聚焦）｜**Game 窗口 = 相机视角**
+
+### ⭐ 运动母公式
+
+```csharp
+transform.position += new Vector3(speed * Time.deltaTime, 0f, 0f);
+//                              └──── 这一帧应该走的距离 ────┘
+```
+
+- **`Update` 是"每帧一次"，不是"每秒一次"** → 必须 `× Time.deltaTime` 换算成"每秒"
+- **去掉 `deltaTime`** → "每秒移动"变"每帧移动" → 实测一秒上千帧 → **速度放大 ~1000 倍**
+- **铁律**：凡是"每秒多少"的（移动/旋转/冷却/计时）一律 `× Time.deltaTime`；"每帧一次"的（读输入）不乘
+- 数学本质 = **数值积分（欧拉法）**：时间切片，每片当匀速累加
+- "10 秒后 ≈ 10 而非精确 10"的两个原因：①**`deltaTime` 每帧在波动**（主因）②浮点累加误差（次因）
+- **两条互斥的移动路线**：直接改 `transform.position`（运动学，自己算，会穿墙）｜ 操作 `Rigidbody`（物理引擎算，有碰撞重力）
+  - ⚠️ **千万别混用**（加了 `Rigidbody` 还在 `Update` 里手改 `position` → 抖动/穿模/弹飞）
+
+### ⚠️ 世界坐标 vs 本地坐标（**最容易搞反的一处**）
+
+| | 代码 API | **Inspector 的字段** |
+|---|---|---|
+| 世界坐标 | **`transform.position`** ✅ | ❌ **看不到** |
+| 本地坐标 | `transform.localPosition` | ✅ **「位置」显示的就是它** |
+
+**Unity 官方手册原文**（Unity 6.0 与 4.3 两版一致）：
+
+> *"The Transform values for any child GameObject are displayed **relative to the parent GameObject's Transform values**. These values are called **local coordinates**."*
+> *"Unity measures the Position, Rotation and Scale values of a Transform **relative to the Transform's parent**. If the Transform has no parent, Unity measures the properties in world space."*
+
+**结论**：
+- **Inspector 的「位置 / 旋转 / 缩放」全部是本地坐标**（有父物体时）；Normal 和 Debug **两个模式显示的都是本地值**，Debug 只是把序列化字段名（`局部位置`）直接暴露出来
+- **世界坐标没有任何面板字段** → **只能在代码里取**
+- 在面板里改「位置」等价于 `transform.localPosition = ...`（**不是** `transform.position = ...`）——**两套量搞混是父子结构下最经典的 bug 来源**
+- **为什么这样设计**：调子物体时关心的是"相对父物体的偏移"（父动子动是常态）
+- **父子关系**：`世界坐标 = 父的世界坐标 + 自己的本地坐标`（无旋转缩放时）；拖拽成子物体时 Unity **保持世界位置不变**，自动改本地坐标
+- **父子关系的价值**：角色跑动时手里的剑**不需要写任何跟随代码** —— 剑的 `localPosition` 一直是 `(0.5, 0, 0)`，世界坐标被"继承"着算出来
+
+### CS1612：属性返回 struct → 只能"整体读写"
+
+```csharp
+transform.position += v;        // ✅ 展开成 transform.position = transform.position + v（整体赋值）
+transform.position.x = 5f;      // ❌ CS1612：无法修改"Transform.position"的返回值，因为它不是变量
+```
+
+**根因链**：`position` 是**属性**（执行代码，**返回一份拷贝**）→ `Vector3` 是 **struct** → 属性返回 struct = 返回拷贝 → 拷贝没有名字、没有存储位置 → **不是变量** → 不能出现在赋值号左边
+
+| 写法 | 流程 | 合法 |
+|---|---|---|
+| `transform.position += v;` | 读 → 算新的 → **整体写回** | ✅ |
+| `transform.position.x = 5f;` | 读 → 改拷贝 → **丢掉** | ❌ |
+
+**三种正解**：
+1. `Vector3 p = transform.position; p.x = 5f; transform.position = p;`（局部变量是变量，合法）
+2. `transform.position = new Vector3(5f, p.y, p.z);`（整体赋值）
+3. **优先用 Unity 封装的方法**：`transform.Translate(...)` / `transform.Rotate(...)` —— **这类方法存在的意义就是帮你做"读-改-写回"**
+
+**类推**：
+| 写法 | 合法 | 原因 |
+|---|---|---|
+| `list[0].x = 5f`（`List<Vector3>`） | ❌ | 索引器是**属性**（返回拷贝） |
+| `arr[0].x = 5f`（`Vector3[]`） | ✅ | **数组下标是语言内建的"变量"** |
+
+**为什么编译器要拦**：它能确定这个操作毫无意义。**宁可编译报错，也不要静默 bug。**
+
+> 与 Unity 生命周期对照：**编译器能管的错 → 报错**（`virtual`/CS1612）；**编译器管不了的（引擎反射）→ 静默失效**（`void update()`）。**凡是能靠编译器抓的，绝不留到运行时。**
+
+### 字段 vs 属性（判定三步法）
+
+| 长相 | 是什么 |
+|---|---|
+| 类型 + 名字 + `;` | **字段** |
+| `{ get; set; }` / `{ get {…} set {…} }` / `=> 表达式` | **属性** |
+| `this[int] { get; set; }` | **索引器**（本质是属性） |
+
+1. **看写法**（有花括号 → 属性）
+2. **看命名惯例**（字段 `_camelCase`、属性 `PascalCase`）——⚠️ **只能猜，不能定**
+3. **悬停 / `F12` 转到定义** —— ⭐ **唯一权威判定**
+
+**四个实际后果**：
+| # | 差异 | 字段 | 属性 |
+|---|---|---|---|
+| 1 | 能否"只改一个分量" | ✅（是变量） | ❌ CS1612 |
+| 2 | 能否当 `out`/`ref` 参数 | ✅ | ❌ CS0206 |
+| 3 | 读取代价 | 近乎零 | **要执行代码**（`transform.position` 要跨到引擎内部取数 → **读一次缓存到局部变量**） |
+| 4 | 结果是否稳定 | 一定稳定 | 可能每次不同（计算属性） |
+
+**记忆锚点**：**字段 = 抽屉**（直接拿/放）｜**属性 = 前台**（跑一套流程再给你；**没法隔着前台动抽屉里的某一格**）
+
+## 27. 内存模型：堆与栈（09-17 · 计基随行）
+
+| | **栈 Stack** | **堆 Heap** |
+|---|---|---|
+| 管谁 | 编译器/运行时**自动** | **GC 垃圾回收器** |
+| 装什么 | 局部变量、参数、返回值、返回地址 | `new` 出来的**对象**、数组、字符串、装箱盒 |
+| 分配 | **极快**（挪指针，O(1)，无查找无锁，缓存友好） | 慢（找空间 + 记账，有碎片） |
+| 回收 | 方法返回即消失（**零成本**） | GC 遍历标记 + 清理 + 搬移压缩（**可能卡顿**） |
+| 大小 | 小（约 **1MB**）→ 递归太深 **StackOverflow（不可捕获，进程直接死）** | 大（**GB 级**）→ 满了只是 `OutOfMemoryException`（**可捕获**） |
+| 生命周期 | **跟方法同生共死** | **只要有引用就一直活着** |
+
+**为什么必须分两块？—— 根本原因是"生命周期"**：
+- 局部变量 `int i` 方法一返回就该消失 → 栈天生合适（指针一挪就没了）
+- `new` 的对象要活得比方法久（要交给别人用）→ 栈做不到 → 必须堆 + 找 GC 当管家（这也是 09-08 `IReadOnlyList` 把对象交出去后依然有效的原理）
+
+**⚠️ 三个必须澄清的误区**：
+1. **不是"值类型在栈、引用类型在堆"** —— **存储位置取决于"变量住在哪"**：
+   - `int x`（局部）/ `Vector3 v`（局部）→ **栈**
+   - `class` 里的 `int` 字段 / **`Transform` 里的 `Vector3 position`** → **堆**（**内嵌**在对象里）
+2. **`new` ≠ "上堆"**：`Vector3 v = new Vector3(1,2,3);` —— `new` 只是调用构造函数，`v` 仍在栈上
+3. **对象里的值类型字段是"内嵌"，不是"指向"**：`Transform` 对象里直接躺着 12 字节的 `position`
+
+> 🔗 **`transform.position` 的本质**：从**堆上**的 Transform 对象里，把那 12 字节**拷贝到栈上**给你 —— 这正是 CS1612 的物理原因（你改的是栈上那份拷贝）。
+
+**由此推出两条 Unity 铁律（都为了少制造堆垃圾）**：
+1. **不要在 `Update()` 里频繁 `new`** —— 每帧一个对象 = GC 不断工作 → **"GC 尖峰导致掉帧"**
+2. **对象池** —— 提前造一批循环使用，不反复 `new`/销毁（09-22 打砖块落地）
+
+> 💡 `string` 是不可变的**引用类型**：每次 `+` 都在堆上**新建一个字符串**（循环拼 1000 次 = 1000 个垃圾）。
+
+## 28. C# 数值精度与浮点数（09-17）
+
+### `f` 后缀：小数的默认类型是 `double`，不是 `float`
+
+| 字面量 | 默认类型 |
+|---|---|
+| `1` | `int` |
+| **`1.0`** | **`double`** ← 关键 |
+
+```csharp
+float a = 1;        // ✅ int → float 是隐式"升级"
+float b = 1f;       // ✅ 明确指定 float（等价 1.0f）
+float c = 1.0;      // ❌ CS0664：无法将 double 隐式转换为 float
+```
+
+**隐式转换铁律：只允许"升级"（不丢数据），不允许"降级"（可能丢数据）**
+| 方向 | 允许 | 原因 |
+|---|---|---|
+| `int` → `float`、`float` → `double` | ✅ 隐式 | 精度变大，不丢 |
+| `double` → `float`、`float` → `int` | ❌ **必须显式强转** | 可能丢精度（C# 要求你签字） |
+
+**后缀表**：
+| 后缀 | 类型 | 位数 | 例子 | 用途 |
+|---|---|---|---|---|
+| （无，整数） | `int` | 32 | `42` | 默认 |
+| **`f`/`F`** | **`float`** | 32 | `1f`、`0.5f` | **Unity 全链路** |
+| `d`/`D` | `double` | 64 | `1.0` | 小数默认 |
+| `m`/`M` | `decimal` | 128 | `9.99m` | **算钱专用**（十进制精确） |
+| `u` / `L` / `ul` | `uint` / `long` / `ulong` | — | `1u`、`1L` | — |
+
+> 💰 **算钱永远用 `decimal`**：`float`/`double` 存不下 0.1（二进制），金额会出错。
+
+**为什么 Unity 满屏 `f`**：`Vector3.x/y/z` 全是 `float`（GPU 和移动端主流是 32 位浮点；double 双倍内存带宽）。所以：
+```csharp
+new Vector3(1, 0, 0);        // ✅ int 能隐式升级
+new Vector3(0.5, 0, 0);      // ❌ 0.5 是 double
+new Vector3(0.5f, 0, 0);     // ✅ 加 f 最保险
+```
+
+### ⚠️ 两个必踩的坑
+
+**① 整数除法**
+```csharp
+float half = 1 / 2;        // ❌ = 0（两个 int 相除 → 整数除法 → 再赋给 float）
+float half = 1f / 2;       // ✅ = 0.5
+float hp = currentHP / maxHP;          // ❌ 进度条/百分比必踩
+float hp = (float)currentHP / maxHP;   // ✅ 强转一个就够
+```
+**规则：表达式里有一个 `float`，整体就按 float 算**（隐式升级）。
+
+**② 绝不用 `==` 比较浮点数**
+```csharp
+0.1f + 0.2f == 0.3f        // ❌ false（二进制存不下 0.1，有微小误差）
+Mathf.Abs(a - b) < 0.0001f // ✅ 判"差值足够小"
+```
+🎮 Unity 里判断"到达目标点了吗""血量为 0 了吗"（float 血量）**都不能用 `==`** —— 这是"明明该触发却没触发"的常见元凶。
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`ReadNumber`（CalculatorV2）**：现在输入流结束（null）时只能返回 0 凑合——学到**异常处理**后，改成把「无输入」上抛给主循环统一处理的正规写法（2026-09-02 记）
@@ -775,3 +963,6 @@ IEnumerable<T>            ← 能被 foreach（最底层能力）
 - [ ] **接口三件套未回收（09-16 记）**：把 `Battle.Run` 的参数从 `List<Character>` 换成 `IEnumerable<Character>` 版本，体会"给别人用就选接口"（顺带：`foreach` 认的就是它）
 - [ ] **`KeyValuePair` 未回收（09-16 记）**：亲手遍历一次 `Dictionary<char,int>`（用 `kv.Key` / `kv.Value`），顺手验证"遍历中不能修改字典"的坑
 - [ ] 学完 **prefab / 对象池**后：`Battle.Run` 里 `new Hero(...)` 的写法换成 Unity 的 `Instantiate`（09-22 打砖块时自然撞上）
+- [ ] **`TransformProbe` 未跑（09-17 记）**：用脚本打印 `transform.position` / `transform.localPosition`，亲手对照 Inspector 的「位置」到底绑的是哪个（**顺延到 09-20 复盘日**）
+- [ ] **实验 5 未做（09-17 记）**：同一物体挂两个反向 `Mover` —— 体会"组件是各自独立的动力源"（09-20 复盘日）
+- [ ] **世界/本地坐标的代码实践（09-17 记）**：写代码让子物体"绕父物体转"，体会 `localPosition` 相对父物体的语义（打砖块前补齐）
