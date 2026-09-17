@@ -48,6 +48,7 @@
 | 9/14 周一 | **Block 2 开跑**：哈希表线开启（217 存在重复元素 + 1 两数之和哈希重写，**O(n²)→O(n) 销账**）+ **接口入门**（IAttackable 契约 → Attack 能攻击宝箱：契约随血缘下传、同契约不同实现）+ 计基随行首课（哈希表内部原理） | ✅ 2 题 | ✅ |
 | 9/15 周二 | 哈希表续（383 赎金信 + 349 交集·双版本对照）+ **抽象类 abstract**（Character 不可实例化 / 强制子类填空 → 参数化 + 公共部分上提父类重构 → **abstract 退位**：抽象层次匹配真实差异） | ✅ 2 题 | ✅ |
 | 9/16 周三 | 哈希线收尾（202 快乐数·HashSet 判环 + 387 第一个唯一字符·两趟计数）+ **Unity 热身**：第一个 MonoBehaviour + 生命周期 7 回调实测（Awake→OnEnable→Start→Update/LateUpdate→OnDisable→OnDestroy）+ 组件禁用 vs 物体禁用对照实验 + 🎓 **CharacterBattle 搬进 Unity 跑通**（4 个环境坑 + 括号层级事故 + UTF-8 编码坑） | ✅ 2 题 | ✅ |
+| 9/17 周四 | **Unity 正课 Day 1**：GameObject/Component/Transform 三件套 + Scene/Game 双窗口 + 脚本控制移动（`位置 += 速度×deltaTime` 帧率无关性）+ **CS1612**（属性返回 struct 只能整体读写）+ **认知纠偏：Inspector 显示的是本地坐标，世界坐标只能代码取**（亲手实验推翻了 AI 的错误说法）+ 计基：堆与栈 + float 后缀与浮点规则 | ✅ 1 题 | ✅ |
 
 ## 沉淀笔记
 
