@@ -6,7 +6,7 @@
 ## 目录结构
 
 ```
-学习实践/
+Learning/
 ├── LeetCode/          # 算法题解（按题组织：题号-题名/，详见 LeetCode/README.md）
 ├── CSharpPractice/    # C# 主线练习（按 年/月/日/主题 组织，详见 CSharpPractice/README.md）
 ├── Projects/          # 里程碑成品（按技术栈分大类）
@@ -49,6 +49,7 @@
 | 9/15 周二 | 哈希表续（383 赎金信 + 349 交集·双版本对照）+ **抽象类 abstract**（Character 不可实例化 / 强制子类填空 → 参数化 + 公共部分上提父类重构 → **abstract 退位**：抽象层次匹配真实差异） | ✅ 2 题 | ✅ |
 | 9/16 周三 | 哈希线收尾（202 快乐数·HashSet 判环 + 387 第一个唯一字符·两趟计数）+ **Unity 热身**：第一个 MonoBehaviour + 生命周期 7 回调实测（Awake→OnEnable→Start→Update/LateUpdate→OnDisable→OnDestroy）+ 组件禁用 vs 物体禁用对照实验 + 🎓 **CharacterBattle 搬进 Unity 跑通**（4 个环境坑 + 括号层级事故 + UTF-8 编码坑） | ✅ 2 题 | ✅ |
 | 9/17 周四 | **Unity 正课 Day 1**：GameObject/Component/Transform 三件套 + Scene/Game 双窗口 + 脚本控制移动（`位置 += 速度×deltaTime` 帧率无关性）+ **CS1612**（属性返回 struct 只能整体读写）+ **认知纠偏：Inspector 显示的是本地坐标，世界坐标只能代码取**（亲手实验推翻了 AI 的错误说法）+ 计基：堆与栈 + float 后缀与浮点规则 | ✅ 1 题 | ✅ |
+| 9/18 周五 | **Unity Day 2 · 第 6 号成品立项**：290 单词规律（205 的文字版：双字典 + 长度前置检查）+ 仓库内新建 2D 项目 `Projects/Unity/Breakout`（专用 .gitignore 当天实测生效，39 个文件入库、Library/Temp 全被拦）+ **Input 读输入**（轴名表 / `GetAxis` 平滑 vs `GetAxisRaw` 硬开关）+ **Rigidbody2D 三种主体类型**（挡板 = Kinematic）+ **双时钟 `Update`×`FixedUpdate`** + **`MovePosition` 提交目标位置**（对比 `transform.position +=` 直接瞬移）+ `GetComponent<T>()` / `[SerializeField]`；踩坑：缺 BoxCollider2D、少提交那行导致挡板不动、`GetAxis` 平滑造成"松手滑行"、活动输入处理默认「新」要改「两者」、VS2022 存 GB2312 导致中文乱码 | ✅ 1 题 | ✅ |
 
 ## 沉淀笔记
 
