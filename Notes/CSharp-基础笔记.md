@@ -951,6 +951,101 @@ Mathf.Abs(a - b) < 0.0001f // ✅ 判"差值足够小"
 ```
 🎮 Unity 里判断"到达目标点了吗""血量为 0 了吗"（float 血量）**都不能用 `==`** —— 这是"明明该触发却没触发"的常见元凶。
 
+## 29. Unity 输入与物理（09-18）
+
+### 一、读输入：轮询（拉），不是消息（推）
+```csharp
+Input.GetKey(KeyCode.A)        // 按住期间每帧为真（状态）
+Input.GetKeyDown(KeyCode.A)    // 按下那一帧为真（事件）
+Input.GetKeyUp(KeyCode.A)      // 松开那一帧为真（事件）
+Input.GetAxisRaw("Horizontal") // -1 / 0 / +1，瞬时
+Input.GetAxis("Horizontal")    // -1 ~ +1，平滑过渡
+```
+- 与生命周期对照：生命周期是**引擎按名字点名（推）**，输入是**你每帧主动去问（拉）**
+
+### 二、⭐ GetAxis vs GetAxisRaw（"松手后滑行"的根因）
+| API | 松手瞬间 | 适合 |
+|---|---|---|
+| `GetAxis` | **平滑回落**：按该轴 `Gravity` 参数衰减（默认 3 → 约 0.33 秒归零） | 要缓动手感（赛车/转向） |
+| `GetAxisRaw` | **立刻归零** | 要"指哪打哪"（挡板） |
+
+- **滑行 ≠ 物理惯性**：Kinematic 刚体没有质量/摩擦/惯性，位置完全由代码指定 → 滑行只来自**输入值的平滑**
+- 手感可调：`项目设置 → 输入管理器 → 轴` 里改 `Gravity`（回落速度）/ `Sensitivity`（上升速度）→ **参数化而不是写死**
+- 排查心法：先分清"**输入平滑**"和"**刚体阻尼**"两个完全不同的成因，方向错了会白调半天
+
+### 三、轴名表 = 数据驱动的输入配置
+- `"Horizontal"` 是**名字**，Unity 拿它去 `ProjectSettings/InputManager.asset` 这张表里查（拼错/大小写错 → `Input Axis xxx is not setup` 异常）
+- 默认 `Horizontal` = 主键 `left`/`right` + 备用键 `a`/`d`（`Alt Negative/Positive Button`）
+- 意义：**代码只说"我要水平轴"，具体是哪些键由表决定** → 换键位不改代码，还能同时吃键盘与手柄
+- 表属于 `ProjectSettings/` → **会进 git**，换机器克隆下来键位设置跟着走
+
+### 四、⭐ 双时钟：Update vs FixedUpdate
+| | `Update` | `FixedUpdate` |
+|---|---|---|
+| 频率 | 每帧一次（跟帧率，几十 ~ 上千次/秒） | 固定物理步长，默认 0.02s = **50Hz** |
+| 谁驱动 | 渲染循环 | 物理引擎 |
+| 一帧内跑几次 | 必然 1 次 | **0 / 1 / 多次** |
+| 放什么 | 读输入、相机（`LateUpdate`）、纯逻辑/UI | **所有物理操作**（力、速度、`MovePosition`） |
+| 配套时间量 | `Time.deltaTime` | `Time.fixedDeltaTime` |
+
+- 为什么输入在 `Update` 读：`GetKeyDown` 只在"按下那一帧"为真，而 `FixedUpdate` 一帧可能 0 次或多次 → **会漏按键 / 重复触发**
+- 代价：`Update` 写的值最快要到下一次 `FixedUpdate` 才被用掉（最多一帧延迟，对挡板无感）
+- ⚠️ `FixedUpdate` 拼错 = 永不执行且不报错（生命周期"按名字点名"同款坑）
+
+### 五、Rigidbody2D：三种主体类型（Body Type）
+| 类型 | 谁控制位置 | 典型用途 |
+|---|---|---|
+| **Dynamic** 动态 | 物理引擎（重力/受力/被撞飞） | 球 |
+| **Kinematic** 运动学 | **代码**（`MovePosition`），但仍参与碰撞、能顶飞别人 | 挡板 |
+| **Static** 静态 | 谁都不动 | 地板、墙 |
+
+- 改成 Kinematic 后，`质量 / 线性阻尼 / 重力大小` 这些参数失效（谁在管位置，一目了然）
+
+### 六、⭐ 移动的两种语义（今天的分水岭）
+```csharp
+transform.position += v;    // 直接改坐标（瞬移）：绕过物理引擎 → 两套账打架（抖动/穿墙/碰撞失真）
+_rb.MovePosition(next);     // 申请："这一步请把我搬到 next" → 引擎执行 + 同步 Transform + 顺便做碰撞检测
+```
+- `MovePosition` 要的是**目标位置**，不是增量 → 得自己算 `当前位置 + 位移`
+- 基准用 `_rb.position`（**物理引擎账本里的位置**，Vector2），比 `transform.position` 更可靠
+
+### 七、为什么 `_rb.position += v` 编译不过
+- `Rigidbody2D.position` 是**只读属性**（只有 get）→ **CS0200**（不能赋值）
+- 对照：`transform.position` 有 setter → `+=` 能过（编译器展开成"整体读-加-整体写回"）；`transform.position.x = 5f` 是 **CS1612**（改的是返回的拷贝）→ 同属第 26 章"字段 vs 属性"
+
+### 八、取组件与暴露字段
+- `_rb = GetComponent<Rigidbody2D>();`：去**自己所在的 GameObject** 上找组件（找不到返回 `null`）；`transform` 本质就是白送的 `GetComponent<Transform>()`
+- 放 `Awake`：生命周期最早、只跑一次，保证后续方法用时已接好
+- `[SerializeField] private float speed = 8f;` = **对检查器开窗、对代码关门**（`public` 会拆掉封装墙）；运行时才赋值的引用（`_rb`）**不要**加
+
+### 九、⚠️ 2D / 3D 是两套物理引擎
+| | 3D | 2D |
+|---|---|---|
+| 刚体 | `Rigidbody` | `Rigidbody2D` |
+| 碰撞体 | `BoxCollider` | `BoxCollider2D` / `CircleCollider2D` |
+| 渲染 | `MeshRenderer` | `SpriteRenderer` |
+
+- 混用**不报错、静默失效**（2D 物体挂 3D `Rigidbody` = 完全不参与 2D 物理）
+
+### 十、活动输入处理（旧 / 新 / 两者）
+- `项目设置 → 玩家 → 其他设置 → 活动输入处理`：Unity 6 新项目模板默认「**输入系统包（新）**」→ 旧的 `Input.*` 会**直接抛异常**
+- 学习期选「**两者**」（改完需**重启编辑器**）：两套 API 都能用；新输入系统（Input Actions + 按键重映射）留到需要多平台/自定义键位时专门学
+- 心法：**API 不生效 → 先查项目设置，再怀疑代码**
+
+### 十一、编码坑：VS2022 存 GB2312 → CodeBuddy 乱码
+- 症状：同一文件 VS2022 中文正常，CodeBuddy（VS Code 系，默认按 UTF-8 解码）全是乱码
+- 根因：VS2022 按中文 Windows 的**系统代码页（GB2312 / 936）**保存，没存成 UTF-8
+- 修法：VS2022 `文件 → 高级保存选项` → **`Unicode (UTF-8 带签名) - 代码页 65001`**
+- 为什么"带签名"（BOM）：文件头写死"我是 UTF-8"（`EF BB BF`），任何编辑器都不用猜
+- Unity 要求 `.cs` 用 UTF-8（GBK 字节被按 UTF-8 解码 → 注释乱码，甚至编译报错）
+- 校验技巧：`UTF8Encoding($false, $true)` 严格解码能过 = 合法 UTF-8；再看头 3 字节有没有 BOM
+- 编辑器日志：CodeBuddy 输出面板的 `[info]` 只是正常心跳（识别工作区/仓库），**只有 `[error]` 才要管**
+
+### 十二、Unity 项目进 git（首次入库实测）
+- 待跟踪文件 **39 个**（`Assets/` + `Packages/` + `ProjectSettings/`），`Library/ Temp/ Logs/ *.csproj *.sln` 全被 `.gitignore` 拦住
+- 验证手段：`git status --short --untracked-files=all` + `Select-String 'Library/'`（应为空）；`git check-ignore -v <路径>`（能看到是哪一条规则拦下的）
+- 必须提交的三样：`Assets/`（**含 `.meta`**）、`Packages/`、`ProjectSettings/`
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`ReadNumber`（CalculatorV2）**：现在输入流结束（null）时只能返回 0 凑合——学到**异常处理**后，改成把「无输入」上抛给主循环统一处理的正规写法（2026-09-02 记）
@@ -966,3 +1061,8 @@ Mathf.Abs(a - b) < 0.0001f // ✅ 判"差值足够小"
 - [ ] **`TransformProbe` 未跑（09-17 记）**：用脚本打印 `transform.position` / `transform.localPosition`，亲手对照 Inspector 的「位置」到底绑的是哪个（**顺延到 09-20 复盘日**）
 - [ ] **实验 5 未做（09-17 记）**：同一物体挂两个反向 `Mover` —— 体会"组件是各自独立的动力源"（09-20 复盘日）
 - [ ] **世界/本地坐标的代码实践（09-17 记）**：写代码让子物体"绕父物体转"，体会 `localPosition` 相对父物体的语义（打砖块前补齐）
+- [ ] **手感实验未做（09-18 记）**：把 `Horizontal` 的 `Gravity` 改成 100（或换回 `GetAxis`）对比挡板手感，顺手看 `Sensitivity`（09-19 顺手做）
+- [ ] **`Update` / `FixedUpdate` 顺序实验（09-18 记）**：两个方法里各打 `Time.time` + `Time.frameCount`，亲眼看次数与顺序（验证"物理步在渲染前"）
+- [ ] **边界 Clamp 未做（09-18 记）**：用 `Camera.main.orthographicSize * Camera.main.aspect` 算屏幕半宽，夹住挡板 x（09-19 做）
+- [ ] **挡板 Body Type 对照实验（09-18 记）**：换成 Dynamic + 冻结 Y/旋转，体会"能被球撞飞"的差别（09-21 学碰撞时做）
+- [ ] **学完新输入系统（Input Actions）后**：把挡板/角色输入改成 `InputAction` 版本，再做一次按键重映射（Block 3 平台跳跃时安排）
