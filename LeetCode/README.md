@@ -3,7 +3,7 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（26 题）
+## 简单（27 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
@@ -27,6 +27,7 @@
 | 232 | 用栈实现队列 | 9/10 | 双栈倒手：inStack 管进、outStack 管出；outStack 空时倒手一次，顺序翻转 O(n) 均摊（陷阱：for 条件引用会变的 Count） | [0232-ImplementQueueUsingStacks](0232-ImplementQueueUsingStacks/) |
 | 242 | 有效的字母异位词 | 9/3 | int[26] 计数 +1/-1 全零校验 O(n) | [0242-ValidAnagram](0242-ValidAnagram/) |
 | 283 | 移动零 | 8/29 | 一次遍历覆盖写（零计数器）O(n)（[错题本02](../Notes/错题本.md)） | [0283-MoveZeroes](0283-MoveZeroes/) |
+| 290 | 单词规律 | 9/18 | **205 的文字版**：`Split(' ')` 切词 + `char ↔ string` **双字典**双向守门；**长度前置检查**（个数不等直接 False，防越界）O(n) | [0290-WordPattern](0290-WordPattern/) |
 | 344 | 反转字符串 | 9/3 | 双指针原地交换 O(n) | [0344-ReverseString](0344-ReverseString/) |
 | 349 | 两个数组的交集 | 9/15 | HashSet 双版本：手动 `Contains` 收集 vs `IntersectWith` 集合运算 O(n)（后者原地修改、返回 void） | [0349-IntersectionOfTwoArrays](0349-IntersectionOfTwoArrays/) |
 | 383 | 赎金信 | 9/15 | 字符计数消耗：`TryGetValue` 默认值 0 让「不存在」与「配额用完」共用一条判断 O(n) | [0383-RansomNote](0383-RansomNote/) |
@@ -54,5 +55,6 @@
 - [x] 383 赎金信 + 349 两个数组的交集（09-15 ✓）
 - [x] 202 快乐数 + 387 第一个唯一字符（09-16 ✓——哈希表线：判环 + 计数两趟）
 - [x] 205 同构字符串（09-17 ✓——**双射**：单字典只能守一个方向的门）
+- [x] 290 单词规律（09-18 ✓——同一思路的"文字版"：两侧类型不同（`char` ↔ `string`）+ **先挡长度不等的前提**再进循环）
 
 > 进阶预告：两数之和的哈希表解法（O(n)）—— 第 5 周学完 Dictionary 后回来优化。
