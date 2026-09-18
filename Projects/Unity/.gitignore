@@ -1,0 +1,69 @@
+# ══════════════════════════════════════════════════════════════
+# Unity 项目忽略规则（适用于 Projects/Unity/ 下所有 Unity 项目）
+# ══════════════════════════════════════════════════════════════
+#
+# 【三条铁律，先读再改】
+#
+#   ① 必须忽略：Library/ Temp/ Obj/ Logs/ UserSettings/ Build*
+#      → Unity 本地生成的缓存与产物，动辄几个 GB，删掉能自动重建
+#
+#   ② 必须提交：Assets/  ProjectSettings/  Packages/
+#      → 这三样才是项目的真实内容。少了任何一个，别人克隆下来【打不开】
+#
+#   ③ 【绝对不要忽略 *.meta 文件！】
+#      → .meta 记录每个资源的 GUID，是 Unity 引用资源的唯一依据
+#      → 丢掉 .meta = 脚本挂载、材质、预制体引用【全部断裂】
+#      → 这是新手用 git 管 Unity 项目最高频的灾难性错误（网上很多错误教程让你忽略 *.meta）
+# ══════════════════════════════════════════════════════════════
+
+# ---- ① Unity 自动生成的目录（本地缓存，必须忽略）----
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+MemoryCaptures/
+Recordings/
+CrashReports/
+ExportedObj/
+
+# ---- ② 构建产物（可重新生成，且体积大）----
+Build/
+Builds/
+*.apk
+*.aab
+*.app
+*.ipa
+*.unitypackage
+*.x86
+*.x86_64
+*.zip
+
+# ---- ③ IDE 自动生成的项目文件（Unity 每次都会重新生成）----
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# ---- ④ 系统 / 编辑器杂项 ----
+.DS_Store
+Thumbs.db
+.vs/
+.idea/
+.vscode/
+*.tmp
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# ---- ⑤ 崩溃 / 日志上报 ----
+sysinfo.txt
+crashlytics-build.properties
