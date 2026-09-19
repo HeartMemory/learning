@@ -12,7 +12,7 @@ Learning/
 ├── Projects/          # 里程碑成品（按技术栈分大类）
 │   ├── CSharp/        #   C# 完成的工具/项目（如 Calculator 循环菜单版）
 │   └── Unity/         #   Unity 游戏（第 4 周起）
-├── Notes/             # 每日复盘（按 年/月/日：YYYY/MM/DD.md）+ 错题本 + 基础笔记
+├── Notes/             # 每日复盘（年/月/日：YYYY/MM/DD.md）+ 错题本 + C#/Unity 基础笔记
 └── README.md          # 本文件
 ```
 
@@ -50,11 +50,13 @@ Learning/
 | 9/16 周三 | 哈希线收尾（202 快乐数·HashSet 判环 + 387 第一个唯一字符·两趟计数）+ **Unity 热身**：第一个 MonoBehaviour + 生命周期 7 回调实测（Awake→OnEnable→Start→Update/LateUpdate→OnDisable→OnDestroy）+ 组件禁用 vs 物体禁用对照实验 + 🎓 **CharacterBattle 搬进 Unity 跑通**（4 个环境坑 + 括号层级事故 + UTF-8 编码坑） | ✅ 2 题 | ✅ |
 | 9/17 周四 | **Unity 正课 Day 1**：GameObject/Component/Transform 三件套 + Scene/Game 双窗口 + 脚本控制移动（`位置 += 速度×deltaTime` 帧率无关性）+ **CS1612**（属性返回 struct 只能整体读写）+ **认知纠偏：Inspector 显示的是本地坐标，世界坐标只能代码取**（亲手实验推翻了 AI 的错误说法）+ 计基：堆与栈 + float 后缀与浮点规则 | ✅ 1 题 | ✅ |
 | 9/18 周五 | **Unity Day 2 · 第 6 号成品立项**：290 单词规律（205 的文字版：双字典 + 长度前置检查）+ 仓库内新建 2D 项目 `Projects/Unity/Breakout`（专用 .gitignore 当天实测生效，39 个文件入库、Library/Temp 全被拦）+ **Input 读输入**（轴名表 / `GetAxis` 平滑 vs `GetAxisRaw` 硬开关）+ **Rigidbody2D 三种主体类型**（挡板 = Kinematic）+ **双时钟 `Update`×`FixedUpdate`** + **`MovePosition` 提交目标位置**（对比 `transform.position +=` 直接瞬移）+ `GetComponent<T>()` / `[SerializeField]`；踩坑：缺 BoxCollider2D、少提交那行导致挡板不动、`GetAxis` 平滑造成"松手滑行"、活动输入处理默认「新」要改「两者」、VS2022 存 GB2312 导致中文乱码 | ✅ 1 题 | ✅ |
+| 9/19 周六 | **Unity Day 3 · Prefab 与阵列装配**：350 两个数组的交集 II（计数表"库存取货"）+ **Prefab 模具 + `Instantiate` 批量生成 32 块砖阵列**（`List` 存引用 / `SetParent` 挂容器 / 防御性"保险丝"）+ 挡板边界 `Clamp`；踩坑三连（字段初始化器里访问 `transform` 报错、**生成器自引用→编辑器假死**（强杀 + 场景恢复救回）、场景一直没保存）；**笔记整理：Unity 内容拆出独立专册 `Notes/Unity-基础笔记.md`** | ✅ 1 题 | ✅ |
 
 ## 沉淀笔记
 
 - [错题本](Notes/错题本.md)：重点错误复盘（错误思路 → 反例 → 正确模型 → 教训）
-- [C# 基础笔记](Notes/CSharp-基础笔记.md)：知识点系统沉淀 + 回访清单（随进度更新）
+- [C# 基础笔记](Notes/CSharp-基础笔记.md)：C# 语言 + 计基随行知识点沉淀 + 回访清单（随进度更新）
+- [Unity 基础笔记](Notes/Unity-基础笔记.md)：Unity 专册（脚本生命周期 / 空间与运动 / 输入与物理 / Prefab），2026-09-19 从 C# 笔记拆出
 - 每日复盘：`Notes/YYYY/MM/DD.md`
 
 （每天收工后更新）

@@ -5,12 +5,17 @@ public class PaddleController : MonoBehaviour
     [SerializeField] private float speed = 8f;   // 每秒移动多少单位
     private Rigidbody2D _rb;
     private float _axis;                         // Update 写、FixedUpdate 读
+    private float _limit;                        // x 的合法范围（半屏宽 - 半挡板宽）
 
     void Awake()
     {
         // 取自身这个 GameObject 上的 Rigidbody2D 组件（找不到返回 null）
         // 放 Awake：生命周期最早的一批，只跑一次，保证后面用到它时已经接好
         _rb = GetComponent<Rigidbody2D>();
+        float halfScreen = Camera.main.orthographicSize * Camera.main.aspect;  // 屏幕【半宽】
+        float halfPaddle = transform.localScale.x * 0.5f;                       // 挡板【半宽】
+        _limit = halfScreen - halfPaddle;                             // x 的合法范围
+
     }
 
     void Update()
@@ -28,6 +33,7 @@ public class PaddleController : MonoBehaviour
         //   位移 = 方向(_axis) × 速度(speed) × 物理步长(fixedDeltaTime)
         //   注意：next 只是"想去的目标位置"，真正的移动要靠 Rigidbody2D 的 MovePosition 提交
         Vector2 next = _rb.position + new Vector2(_axis * speed * Time.fixedDeltaTime, 0f);
+        next.x = Mathf.Clamp(next.x, -_limit, _limit);
         _rb.MovePosition(next);
     }
 }
