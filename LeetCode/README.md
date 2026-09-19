@@ -3,7 +3,7 @@
 > 一律用 **C#** 实现。每题一个独立目录：`题号-题名/`，一次 commit 一道题。
 > 索引按**难度分类**，组内按**题号升序**排序。
 
-## 简单（27 题）
+## 简单（28 题）
 
 | 题号 | 题名 | AC 日期 | 解法 | 目录 |
 |---|---|---|---|---|
@@ -30,6 +30,7 @@
 | 290 | 单词规律 | 9/18 | **205 的文字版**：`Split(' ')` 切词 + `char ↔ string` **双字典**双向守门；**长度前置检查**（个数不等直接 False，防越界）O(n) | [0290-WordPattern](0290-WordPattern/) |
 | 344 | 反转字符串 | 9/3 | 双指针原地交换 O(n) | [0344-ReverseString](0344-ReverseString/) |
 | 349 | 两个数组的交集 | 9/15 | HashSet 双版本：手动 `Contains` 收集 vs `IntersectWith` 集合运算 O(n)（后者原地修改、返回 void） | [0349-IntersectionOfTwoArrays](0349-IntersectionOfTwoArrays/) |
+| 350 | 两个数组的交集 II | 9/19 | **计数表 + "库存取货"**：给 nums1 建 Dictionary 计数，扫 nums2 每命中取走一件（计数减到 0 即取完 → 自动实现"次数取较小值"）O(m+n)（349 的去重版会丢次数，不能复用） | [0350-IntersectionOfTwoArraysII](0350-IntersectionOfTwoArraysII/) |
 | 383 | 赎金信 | 9/15 | 字符计数消耗：`TryGetValue` 默认值 0 让「不存在」与「配额用完」共用一条判断 O(n) | [0383-RansomNote](0383-RansomNote/) |
 | 387 | 字符串中的第一个唯一字符 | 9/16 | 两趟：Dictionary 计数 + 再扫首个计数为 1 的下标 O(n)（对比 `int[26]` 特化哈希表） | [0387-FirstUniqueCharacter](0387-FirstUniqueCharacter/) |
 | 389 | 找不同 | 9/4 | 全字符异或，成对抵消 O(n) 时间 O(1) 空间 | [0389-FindTheDifference](0389-FindTheDifference/) |
@@ -56,5 +57,6 @@
 - [x] 202 快乐数 + 387 第一个唯一字符（09-16 ✓——哈希表线：判环 + 计数两趟）
 - [x] 205 同构字符串（09-17 ✓——**双射**：单字典只能守一个方向的门）
 - [x] 290 单词规律（09-18 ✓——同一思路的"文字版"：两侧类型不同（`char` ↔ `string`）+ **先挡长度不等的前提**再进循环）
+- [x] 350 两个数组的交集 II（09-19 ✓——计数表"库存取货"；顺手修掉"没命中却给字典插 -1"的脏写入）
 
 > 进阶预告：两数之和的哈希表解法（O(n)）—— 第 5 周学完 Dictionary 后回来优化。
