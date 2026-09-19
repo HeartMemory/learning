@@ -402,7 +402,7 @@ GameObject:
   - component: {fileID: 1209842786}
   - component: {fileID: 1209842785}
   m_Layer: 0
-  m_Name: Broad
+  m_Name: Board
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
