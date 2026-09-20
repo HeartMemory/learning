@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PaddleController : MonoBehaviour
 {
@@ -6,6 +7,7 @@ public class PaddleController : MonoBehaviour
     private Rigidbody2D _rb;
     private float _axis;                         // Update 写、FixedUpdate 读
     private float _limit;                        // x 的合法范围（半屏宽 - 半挡板宽）
+    private InputAction _move;
 
     void Awake()
     {
@@ -15,15 +17,14 @@ public class PaddleController : MonoBehaviour
         float halfScreen = Camera.main.orthographicSize * Camera.main.aspect;  // 屏幕【半宽】
         float halfPaddle = transform.localScale.x * 0.5f;                       // 挡板【半宽】
         _limit = halfScreen - halfPaddle;                             // x 的合法范围
-
+        _move = InputSystem.actions.FindActionMap("Player").FindAction("Move");
     }
 
     void Update()
     {
-        // 输入在 Update 里读（每帧一次）：按 ← 得 -1、→ 得 +1、不按回 0
-        // 用 GetAxisRaw：只给 -1 / 0 / +1，松手立刻归零 → 挡板"指哪打哪"、不滑行
-        //   （GetAxis 是平滑值，松手后按该轴 Gravity=3 约 0.33 秒才回落到 0，会有缓动滑行感；要那种手感时才用它）
-        _axis = Input.GetAxisRaw("Horizontal");
+        // 项目级输入资产（Player 地图 / Move 动作）：每帧"拉"一次当前值
+        // Move 是 Vector2（x 左右、y 上下），挡板只需 x
+        _axis = _move.ReadValue<Vector2>().x;
     }
 
     void FixedUpdate()
