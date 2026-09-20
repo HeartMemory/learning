@@ -67,3 +67,7 @@ Thumbs.db
 # ---- ⑤ 崩溃 / 日志上报 ----
 sysinfo.txt
 crashlytics-build.properties
+
+# ---- ⑥ VS 打开 Unity 工程时生成的升级日志（垃圾文件，不该入库）----
+UpgradeLog*.htm
+_Recovery/
