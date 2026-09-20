@@ -18,9 +18,9 @@
 | 121 | 买卖股票的最佳时机 | 8/29 | 单向遍历 + 历史最低价 O(n)（[错题本01](../Notes/错题本.md)） | [0121-BestTimeToBuyAndSellStock](0121-BestTimeToBuyAndSellStock/) |
 | 125 | 验证回文串 | 9/3 | IsLetterOrDigit 过滤 + ToLower + 双指针 | [0125-ValidPalindrome](0125-ValidPalindrome/) |
 | 141 | 环形链表 | 9/8 | 快慢指针判圈（Floyd）O(n) 时间 O(1) 空间 | [0141-LinkedListCycle](0141-LinkedListCycle/) |
-| 202 | 快乐数 | 9/16 | HashSet 判环：每步平方和登记，`Add` 返回 false 即回到老路 O(log n)（踩坑见[错题本](../Notes/错题本.md)） | [0202-HappyNumber](0202-HappyNumber/) |
+| 202 | 快乐数 | 9/16（**09-20 重写**） | HashSet 判环：`Add` 返回值一步完成「查 + 登记」；**先判出口（`n == 1`）→ 再变换 → 再登记新值**（不依赖"起点登记"，比初版更防守）O(log n)（踩坑见[错题本](../Notes/错题本.md)） | [0202-HappyNumber](0202-HappyNumber/) |
 | 203 | 移除链表元素 | 9/7 | 哑节点 + tail 原地拼接，断悬尾 O(n) | [0203-RemoveLinkedListElements](0203-RemoveLinkedListElements/) |
-| 205 | 同构字符串 | 9/17 | **双射（bijection）**：两个 Dictionary 双向守门——`s→t` 管"同一字符不变心"、`t→s` 管"不同字符不撞车"（单字典会漏 `"badc"/"baba"`）O(n) | [0205-IsomorphicStrings](0205-IsomorphicStrings/) |
+| 205 | 同构字符串 | 9/17（**09-20 重写**） | **双射（bijection）**：两张表双向守门 —— `s→t` 管"同一字符不变心"、`t→s` 管"不同字符不撞车"（单表会漏 `"badc"/"baba"`）；**先查 → 不一致立即 false → 无条件登记**（值相同再写一遍是幂等，省掉 else）O(n) | [0205-IsomorphicStrings](0205-IsomorphicStrings/) |
 | 206 | 反转链表 | 9/8 | 头插法：存后继 → 接结果头 → 前进 O(n) | [0206-ReverseLinkedList](0206-ReverseLinkedList/) |
 | 217 | 存在重复元素 | 9/14 | HashSet：用 `Add` 返回值一步完成「查+登记」，返回 false 即撞重复 O(n) | [0217-ContainsDuplicate](0217-ContainsDuplicate/) |
 | 225 | 用队列实现栈 | 9/11 | 单队列绕圈：新元素入队后老元素"出队即入队"绕一圈顶到队头 O(n)（对照双队列中转版，两种解法都写过） | [0225-ImplementStackUsingQueues](0225-ImplementStackUsingQueues/) |
