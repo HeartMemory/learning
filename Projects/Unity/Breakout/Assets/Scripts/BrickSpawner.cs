@@ -3,53 +3,110 @@ using UnityEngine;
 
 public class BrickSpawner : MonoBehaviour
 {
-    [SerializeField] private GameObject brickPrefab;   // 模具
-    [SerializeField] private int cols = 8;             // 列数
-    [SerializeField] private int rows = 4;             // 行数
-    [SerializeField] private float stepX = 1.7f;       // 横向间距（砖宽 1.6 + 缝 0.1）
-    [SerializeField] private float stepY = 0.8f;       // 纵向间距（砖高 0.6 + 缝 0.2）
-    [SerializeField] private Vector2 origin = new Vector2(-5.95f, 3.5f);  // 左上角第一块
+    [SerializeField] private GameObject brickPrefab;
+    [SerializeField] private int cols = 8;
+    [SerializeField] private int rows = 4;
+    [SerializeField] private float stepX = 1.7f;
+    [SerializeField] private float stepY = 0.8f;
+    [SerializeField] private Vector2 origin = new Vector2(-5.95f, 3.5f);
 
-    private readonly List<GameObject> _bricks = new List<GameObject>();
+    private readonly Queue<GameObject> _pool = new Queue<GameObject>();  // 库房（空闲的砖）
+    private int _rentCount;         // 借出总次数（验收用）
+    private int _instantiateCount;  // 真正 new 的次数（验收用：应该只涨到 32）
 
     void Start()
     {
-        SpawnBricks();
+        Preload();
+        FillBoard();
+        Debug.Log($"预分配 {_instantiateCount} 块 ｜ 池中剩余 {_pool.Count} ｜ 借出 {_rentCount} 次");
     }
 
-    void SpawnBricks()
+    void Preload()
     {
-        if (cols <= 0 || rows <= 0) return;                       // 空/负数直接不生成
-        if (cols * rows > 200)                                    // 保险丝：超过上限就拒绝
+        // TODO 1：一次性造够 cols × rows 块
+        //   每块：Instantiate(brickPrefab, transform) → SetActive(false) → 注入（Init）→ 入池
+        //   ★ 保险丝照旧（cols<=0 / cols*rows>200 直接拒绝）
+        //   ★ _instantiateCount++
+        if (cols <= 0 || rows <= 0)
         {
-            Debug.LogError($"砖块数量异常：{cols} × {rows} = {cols * rows}，已拒绝生成");
+            Debug.LogError("列数或行数不合法，无法摆放！");
             return;
         }
-        Debug.Log($"准备生成 {cols * rows} 块砖");
-        for (int row = 0; row < rows; row++)
+        if (cols * rows > 200)
         {
-            for (int col = 0; col < cols; col++)
+            Debug.LogError("砖块总数超过 200，无法摆放！");
+            return;
+        }
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
             {
-                // TODO 1：算出这一块的坐标
-                //   x = origin.x + col * stepX   （列号往右 → 加）
-                //   y = origin.y - row * stepY   （行号往下 → 减！想想为什么是减）
-                //   把两个数组装成一个 Vector2 或 Vector3
-
-                float x = origin.x + col * stepX;
-                float y = origin.y - row * stepY;
-
-                // TODO 2：Instantiate(brickPrefab, 位置, Quaternion.identity)
-                //   注意：它【有返回值】—— 返回刚造出来的那个对象的引用
-
-                GameObject brick = Instantiate(brickPrefab, new Vector2(x, y), Quaternion.identity);
-                brick.transform.SetParent(transform);   // 挂到 Board 底下：层级窗口不炸开，也方便统一管理/回收
-
-                // TODO 3：把返回的引用 Add 进 _bricks
-
-                _bricks.Add(brick);
+                GameObject brick = Instantiate(brickPrefab, transform);
+                brick.SetActive(false);
+                if (!brick.TryGetComponent<Brick>(out var brickScript))
+                {
+                    Debug.LogError($"{brick.name}没有 Brick 脚本组件，无法注入池！");
+                    return;
+                }
+                brickScript.Init(this);
+                _pool.Enqueue(brick);
+                _instantiateCount++;
             }
         }
-        Debug.Log($"生成了 {_bricks.Count} 块砖");   // 这句留着，用来验收
     }
 
+    void FillBoard()
+    {
+        // TODO 2：把砖摆到原来的位置
+        //   每块：从池借出 → 设置位置（用 transform.position，Board 在原点，值等同）
+        //   坐标公式照抄你 09-19 写的两行
+        //   ★ 借出返回 null 时怎么办？（你 B 的决策是"响亮地失败"，这里别静默跳过）
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                GameObject brick = Rent();
+                if (brick == null)
+                {
+                    Debug.LogError("砖块池空了，无法摆放！");
+                    return;
+                }
+                brick.transform.position = new Vector2(origin.x + stepX * c, origin.y - stepY * r);
+                brick.SetActive(true);
+            }
+        }
+    }
+
+    GameObject Rent()
+    {
+        // TODO 3：借出
+        //   池空 → Debug.LogError + return null
+        //   否则 Dequeue → SetActive(true) → _rentCount++ → return
+        if(_pool.Count == 0)
+        {
+            Debug.LogError("砖块池空了，无法借出！");
+            return null;
+        }
+        GameObject brick = _pool.Dequeue();
+        _rentCount++;
+        return brick;
+    }
+
+    public void Return(GameObject brick)
+    {
+        // TODO 4：归还（决策 C 的四条全在这儿用上）
+        if(brick == null)
+        {
+            Debug.LogError("归还的砖块是 null！");
+            return;
+        }
+        if(brick.transform.parent != transform)
+        {
+            Debug.LogError("归还的砖块不属于这个池！");
+            return;
+        }
+        if (!brick.activeSelf) return;
+        brick.SetActive(false);
+        _pool.Enqueue(brick);
+    }
 }
