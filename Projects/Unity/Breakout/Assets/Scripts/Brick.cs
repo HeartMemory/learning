@@ -25,7 +25,7 @@ public class Brick : MonoBehaviour
         //     关掉【脚本组件】之后，这块砖的碰撞体还在不在？球会不会照样撞上来？
         //     （09-16 学过"组件禁用 vs 物体禁用"，今天正好用它来解释一个真实后果）
 
-        gameObject.SetActive(false);
+        _pool.Return(gameObject);
 
         // TODO 3：打一条日志，证明"是砖块自己决定消失的"
         //   建议带上自己的名字和对方是谁，方便验收
