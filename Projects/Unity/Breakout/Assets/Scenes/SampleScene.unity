@@ -682,7 +682,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScoreManager
   scoreText: {fileID: 939073573}
-  ballController: {fileID: 0}
+  brickSpawner: {fileID: 1209842785}
 --- !u!1 &847395350
 GameObject:
   m_ObjectHideFlags: 0
