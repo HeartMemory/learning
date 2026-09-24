@@ -9,8 +9,6 @@ public class BrickSpawner : MonoBehaviour
     [SerializeField] private float stepX = 1.7f;
     [SerializeField] private float stepY = 0.8f;
     [SerializeField] private Vector2 origin = new Vector2(-5.95f, 3.5f);
-    [SerializeField] private int ScorePerBrick = 10;
-    [SerializeField] private ScoreManager scoreManager;
 
     private readonly Queue<GameObject> _pool = new Queue<GameObject>();  // 库房（空闲的砖）
     private int _rentCount;         // 借出总次数（验收用）
@@ -79,7 +77,7 @@ public class BrickSpawner : MonoBehaviour
         }
     }
 
-    GameObject Rent()
+    private GameObject Rent()
     {
         // TODO 3：借出
         //   池空 → Debug.LogError + return null
@@ -109,7 +107,8 @@ public class BrickSpawner : MonoBehaviour
         }
         if (!brick.activeSelf) return;
         brick.SetActive(false);
-        scoreManager.AddScore(ScorePerBrick);
         _pool.Enqueue(brick);
     }
+    public int RemainingBricks => _instantiateCount - _pool.Count;
+    public int TotalBricks => _instantiateCount;
 }
