@@ -18,6 +18,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private ScoreManager scoreManager;   // 写分数
     [SerializeField] private TMP_Text resultText;         // 结果提示（YOU WIN / GAME OVER）
     [SerializeField] private GameObject overlay;
+    [SerializeField] AudioSource audioSource;
 
     private bool _isGameOver = false;             // ⭐ 今天最重要的一个字段
 
@@ -104,6 +105,7 @@ public class GameManager : MonoBehaviour
         _isGameOver = true;
         resultText.text = message;
         overlay.SetActive(true);
+        audioSource.PlayOneShot(Sfx.GameOver());
         Time.timeScale = 0;
     }
     // ─────────────────────────────────────────────────────────────

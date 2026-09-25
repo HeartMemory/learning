@@ -9,6 +9,7 @@ public class BrickSpawner : MonoBehaviour
     [SerializeField] private float stepX = 1.7f;
     [SerializeField] private float stepY = 0.8f;
     [SerializeField] private Vector2 origin = new Vector2(-5.95f, 3.5f);
+    [SerializeField] AudioSource audioSource;
 
     private readonly Queue<GameObject> _pool = new Queue<GameObject>();  // 库房（空闲的砖）
     private int _rentCount;         // 借出总次数（验收用）
@@ -107,6 +108,7 @@ public class BrickSpawner : MonoBehaviour
         }
         if (!brick.activeSelf) return;
         brick.SetActive(false);
+        audioSource.PlayOneShot(Sfx.BrickHit());
         _pool.Enqueue(brick);
     }
     public int RemainingBricks => _instantiateCount - _pool.Count;
