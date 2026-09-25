@@ -3,6 +3,7 @@
 public class BallController : MonoBehaviour
 {
     [SerializeField] private float speed = 6f;   // 面板可调
+    [SerializeField] AudioSource audioSource;
     private Rigidbody2D _rb;
 
     void Awake()
@@ -48,6 +49,7 @@ public class BallController : MonoBehaviour
         //    ★ 注意：这里乘的必须是【速率】(标量)，不是原来的速度向量
         Vector2 dir = new Vector2(t, 1f).normalized;
         _rb.linearVelocity = dir * speed;
+        audioSource.PlayOneShot(Sfx.PaddleHit());
     }
 
     private float GetHitOffset(Collision2D other)
