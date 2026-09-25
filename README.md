@@ -56,12 +56,13 @@ Learning/
 | 9/23 周三 | **Unity Day 6 · UGUI 计分**：Canvas（屏幕空间-叠加）+ **TextMeshPro**（TMP 基础资源导入 / 用 `TMP_Text` 基类 / 中文字形坑）+ RectTransform **锚点与轴心**（轴心默认居中导致文字被切）+ **Canvas Scaler**（按屏幕大小缩放 / 1920×1080 基准 / 匹配 0.5）+ `ScoreManager` 接池的归还路径（**加分放在三道防线之后 → 幂等**）→ 撞砖 +10、打光 32 块 = **320 分**；教训：**磁盘才是事实**（UI 一度只在内存里、Scaler 两次没落盘）；算法休（Unity 优先日） | — | ✅ |
 | 9/22 周二 | **Unity Day 5 · 对象池落地**：136 只出现一次的数字 AC（位运算线首题，全场异或抵消成对元素，O(1) 空间）+ **撞砖消失**（`Ball` 标签 + `CompareTag` 门卫 + 砖块自治）+ **对象池**（`Queue` 库房 / 预分配 32 / 借出-归还 / `Init` 运行时注入 / 双重归还防线 `activeSelf`）+ **击打点改角度**（Pong 手感：`GetContact(0)` 偏移 → 覆盖方向并锁速率）+ 手感修复（**球碰撞体漏挂材质** → 摩擦 0.2 处处打滑）；教训：**"写完"≠"通了"**（池"只借不还"靠数据才戳穿）+ Unity **三层保存**（脚本/场景/项目设置） | ✅ 1 题 | ✅ |
 | 9/24 周四 | **Unity Day 7 · 🏆 第 6 号成品「胜负 / 重开」闭环达成**：169 多数元素 AC（**摩尔投票**：候选者 + 净票数、票归零换人上位；写成 `>=` 的剪枝造成假 AC，被**穷举 n≤11 的反例**抓出 → 错题本 13）+ **架构决策「方案甲」**：引入 `GameManager` 当**唯一裁判**，`BrickSpawner` 暴露 `TotalBricks` / `RemainingBricks` 两条**状态**属性，**分数改成派生量**（销掉 09-23 伏笔 + 删掉预留字段）+ **漏球判定线 `FailZone`**（Trigger 三条件 / 世界单位换算 / 半透明 `Overlay` 遮罩）+ **通关·失败·重开闭环**（`End()` **唯一出口上锁** + `SceneManager.LoadScene` + `Time.timeScale` 那笔**静态账** + `OnClick → Restart()`）；三条教训：**入口上锁 ≠ 全局上锁**、**`{fileID: 0}` 就是空槽位**、**日志放在会抛异常的行之后等于没放** | ✅ 1 题 | ✅ |
+| 9/25 周五 | **Unity Day 8 · Animator + 音效（第 6 号成品观感成型）**：**Animator 全链路** —— `AnimationClip`（关键帧录制）→ `AnimatorController` → `Animator` 组件（`Update Mode` 改 **`Unscaled Time`**，因为 `timeScale = 0` 会把动画一起冻住）→ `CanvasGroup` **整组淡入**（`alpha` 乘法传播给子物体，`Interactable` / `Blocks Raycasts` 管"能不能点"）；**程序化音效**（`AudioClip.Create` + 正弦 × 指数包络，**`decay × duration ≥ 3` 无爆音**；**缓存**避免 450KB GC 垃圾；**3 音高变体**解决"同相位叠加只有一声"）→ 撞砖 / 挡板 / 结算三处接线（3 个 `AudioSource`，`Spatial Blend` 全 2D）；三条教训：**`timeScale` 的影响力半径**、**保存有第四层（资产）且一个坏资产能连坐一整片**、**"看不见" ≠ "点不到"**；算法休（Unity 优先日） | — | ✅ |
 
 ## 沉淀笔记
 
 - [错题本](Notes/错题本.md)：重点错误复盘（错误思路 → 反例 → 正确模型 → 教训）
 - [C# 基础笔记](Notes/CSharp-基础笔记.md)：C# 语言 + 计基随行知识点沉淀 + 回访清单（随进度更新）
-- [Unity 基础笔记](Notes/Unity-基础笔记.md)：Unity 专册 **9 章**（脚本生命周期 / 空间与运动 / 输入与物理 / Prefab 装配 / 碰撞与反弹 / **对象池与 GC** / **碰撞进阶与手感** / **UGUI 与 TMP** / **架构决策与配置陷阱**），2026-09-19 从 C# 笔记拆出
+- [Unity 基础笔记](Notes/Unity-基础笔记.md)：Unity 专册 **10 章**（脚本生命周期 / 空间与运动 / 输入与物理 / Prefab 装配 / 碰撞与反弹 / **对象池与 GC** / **碰撞进阶与手感** / **UGUI 与 TMP** / **架构决策与配置陷阱** / **Animator 与音频**），2026-09-19 从 C# 笔记拆出
 - 每日复盘：`Notes/YYYY/MM/DD.md`
 
 （每天收工后更新）
