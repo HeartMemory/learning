@@ -1,5 +1,5 @@
-﻿using UnityEngine;
-using TMPro;                            // ★ 结果文本用 TMP_Text（09-23 的老朋友）
+﻿using TMPro;                            // ★ 结果文本用 TMP_Text（09-23 的老朋友）
+using UnityEngine;
 using UnityEngine.SceneManagement;      // ★ 场景重载在 SceneManagement 里（今天的主角）
 
 // ═══════════════════════════════════════════════════════════════════
@@ -63,10 +63,16 @@ public class GameManager : MonoBehaviour
     // ─────────────────────────────────────────────────────────────
     void Update()
     {
-        if (brickSpawner == null || scoreManager == null) return;
+        if (_isGameOver) return;
+        if (brickSpawner == null || scoreManager == null)
+        {
+            Debug.LogError("GameManager 引用缺失：请在检查器里挂上 brickSpawner / scoreManager", this);
+            enabled = false;        //关掉自己，否则每帧刷一条红字，把真正的错误淹掉
+            return;
+        }
         if (brickSpawner.TotalBricks == 0) return;
         scoreManager.SetDestroyedCount(brickSpawner.TotalBricks - brickSpawner.RemainingBricks);
-        if(brickSpawner.RemainingBricks == 0) Win();
+        if (brickSpawner.RemainingBricks == 0) Win();
     }
     // ─────────────────────────────────────────────────────────────
     // TODO 3：三个出口，一个收尾
@@ -79,8 +85,8 @@ public class GameManager : MonoBehaviour
     //     和"出口越多越容易漏路径"（错误 13）的同一条纪律。
     // ─────────────────────────────────────────────────────────────
     public void OnBallLost() { Lose(); }
-    private void Win() { End("YOU WIN"); }
-    private void Lose() { End("GAME OVER"); }
+    private void Win() { End("YOU WIN", Sfx.GameWin()); }
+    private void Lose() { End("GAME OVER", Sfx.GameOver()); }
     // ─────────────────────────────────────────────────────────────
     // TODO 4：收尾
     //   private void End(string message)
@@ -99,13 +105,13 @@ public class GameManager : MonoBehaviour
     //       Q2：FixedUpdate() 还会跑吗？
     //       Q3：UI 按钮还能点吗？（这个最容易想错，实测一下）
     // ─────────────────────────────────────────────────────────────
-    private void End(string message)
+    private void End(string message, AudioClip sound)
     {
         if (_isGameOver) return;
         _isGameOver = true;
         resultText.text = message;
         overlay.SetActive(true);
-        audioSource.PlayOneShot(Sfx.GameOver());
+        audioSource.PlayOneShot(sound);
         Time.timeScale = 0;
     }
     // ─────────────────────────────────────────────────────────────

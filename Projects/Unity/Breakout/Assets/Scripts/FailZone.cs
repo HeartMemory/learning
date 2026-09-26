@@ -36,7 +36,15 @@ public class FailZone : MonoBehaviour
     void OnTriggerEnter2D(Collider2D other)
     {
         if (!other.gameObject.CompareTag("Ball")) return;
+
+        if (gameManager == null)
+        {
+            Debug.LogError("FailZone 没挂 GameManager 引用 → 漏球不会判负", this);
+            return;
+        }
+
+        Debug.Log("球掉进了 FailZone");   // ★ 日志挪到调用【之前】
         gameManager.OnBallLost();
-        Debug.Log("球掉进了 FailZone");
     }
+
 }
