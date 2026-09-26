@@ -57,12 +57,13 @@ Learning/
 | 9/22 周二 | **Unity Day 5 · 对象池落地**：136 只出现一次的数字 AC（位运算线首题，全场异或抵消成对元素，O(1) 空间）+ **撞砖消失**（`Ball` 标签 + `CompareTag` 门卫 + 砖块自治）+ **对象池**（`Queue` 库房 / 预分配 32 / 借出-归还 / `Init` 运行时注入 / 双重归还防线 `activeSelf`）+ **击打点改角度**（Pong 手感：`GetContact(0)` 偏移 → 覆盖方向并锁速率）+ 手感修复（**球碰撞体漏挂材质** → 摩擦 0.2 处处打滑）；教训：**"写完"≠"通了"**（池"只借不还"靠数据才戳穿）+ Unity **三层保存**（脚本/场景/项目设置） | ✅ 1 题 | ✅ |
 | 9/24 周四 | **Unity Day 7 · 🏆 第 6 号成品「胜负 / 重开」闭环达成**：169 多数元素 AC（**摩尔投票**：候选者 + 净票数、票归零换人上位；写成 `>=` 的剪枝造成假 AC，被**穷举 n≤11 的反例**抓出 → 错题本 13）+ **架构决策「方案甲」**：引入 `GameManager` 当**唯一裁判**，`BrickSpawner` 暴露 `TotalBricks` / `RemainingBricks` 两条**状态**属性，**分数改成派生量**（销掉 09-23 伏笔 + 删掉预留字段）+ **漏球判定线 `FailZone`**（Trigger 三条件 / 世界单位换算 / 半透明 `Overlay` 遮罩）+ **通关·失败·重开闭环**（`End()` **唯一出口上锁** + `SceneManager.LoadScene` + `Time.timeScale` 那笔**静态账** + `OnClick → Restart()`）；三条教训：**入口上锁 ≠ 全局上锁**、**`{fileID: 0}` 就是空槽位**、**日志放在会抛异常的行之后等于没放** | ✅ 1 题 | ✅ |
 | 9/25 周五 | **Unity Day 8 · Animator + 音效（第 6 号成品观感成型）**：**Animator 全链路** —— `AnimationClip`（关键帧录制）→ `AnimatorController` → `Animator` 组件（`Update Mode` 改 **`Unscaled Time`**，因为 `timeScale = 0` 会把动画一起冻住）→ `CanvasGroup` **整组淡入**（`alpha` 乘法传播给子物体，`Interactable` / `Blocks Raycasts` 管"能不能点"）；**程序化音效**（`AudioClip.Create` + 正弦 × 指数包络，**`decay × duration ≥ 3` 无爆音**；**缓存**避免 450KB GC 垃圾；**3 音高变体**解决"同相位叠加只有一声"）→ 撞砖 / 挡板 / 结算三处接线（3 个 `AudioSource`，`Spatial Blend` 全 2D）；三条教训：**`timeScale` 的影响力半径**、**保存有第四层（资产）且一个坏资产能连坐一整片**、**"看不见" ≠ "点不到"**；算法休（Unity 优先日） | — | ✅ |
+| 9/26 周六 | **🏆 Block 2 收官 · 第 6 号成品「2D 打砖块」入库**：`49` 字母异位词分组 AC（**哈希分组首题**：计数表当**规范形式** + `Dictionary<string, List<string>>`「键 → 筐」；一路踩掉 5 处坑 —— `int[].ToString()` 返回类型名、索引器"读"不创建、`foreach` 直接遍历字典、`List<List<string>>` 转不成 `IList<IList<string>>`）｜ **打砖块收尾打磨**（`Sfx.GameWin()` 上行三音 + 音效参数化进 `End` + 响亮地失败 + `FailZone` 防线）｜ **抓掉"通关音变电流声"**（每帧叠加 → 锁在入口、副作用在外面）｜ 🎬 **录屏 25 秒 + 3 张截图入库 `demos/`** ｜ ⚠️ 顺带清洗了 git 历史里的 `organizationId`（含手机号，09-18 就已推上公开仓库 → `filter-repo` 脱敏 + 强推） | ✅ 1 题 | ✅ |
 
 ## 沉淀笔记
 
 - [错题本](Notes/错题本.md)：重点错误复盘（错误思路 → 反例 → 正确模型 → 教训）
 - [C# 基础笔记](Notes/CSharp-基础笔记.md)：C# 语言 + 计基随行知识点沉淀 + 回访清单（随进度更新）
-- [Unity 基础笔记](Notes/Unity-基础笔记.md)：Unity 专册 **10 章**（脚本生命周期 / 空间与运动 / 输入与物理 / Prefab 装配 / 碰撞与反弹 / **对象池与 GC** / **碰撞进阶与手感** / **UGUI 与 TMP** / **架构决策与配置陷阱** / **Animator 与音频**），2026-09-19 从 C# 笔记拆出
+- [Unity 基础笔记](Notes/Unity-基础笔记.md)：Unity 专册 **11 章**（脚本生命周期 / 空间与运动 / 输入与物理 / Prefab 装配 / 碰撞与反弹 / **对象池与 GC** / **碰撞进阶与手感** / **UGUI 与 TMP** / **架构决策与配置陷阱** / **Animator 与音频** / **结算音效、锁与副作用、面板值的归属**），2026-09-19 从 C# 笔记拆出
 - 每日复盘：`Notes/YYYY/MM/DD.md`
 
 （每天收工后更新）
