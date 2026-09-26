@@ -19,6 +19,7 @@ public static class Sfx
     private static AudioClip[] _brickHits;
     private static AudioClip _paddleHit;
     private static AudioClip _gameOver;
+    private static AudioClip _gameWin;
 
     // ── 对外只暴露这三个 ────────────────────────────────────────
     //   （`??=` 是 C# 8 的"空合并赋值"：左边为 null 才赋值。
@@ -87,6 +88,31 @@ public static class Sfx
         }
         return Build(name, data);
     }
+    // 🆕 通关音：C5-E5-G5 上行大三和弦（"向上"的音阶 = 胜利感；下滑音 = 失落感）
+    public static AudioClip GameWin()
+    {
+        if (_gameWin == null)
+        {
+            float[] notes = { 523.25f, 659.25f, 783.99f };   // C5 / E5 / G5
+            int perNote = (int)(SampleRate * 0.12f);         // 每个音 120ms
+            float tailLen = SampleRate * 0.02f;              // 段尾 20ms 淡出
+            float[] data = new float[perNote * notes.Length];
+
+            for (int n = 0; n < notes.Length; n++)
+            {
+                for (int i = 0; i < perNote; i++)
+                {
+                    float t = (float)i / SampleRate;
+                    float envelope = Mathf.Exp(-8f * t);                   // 段内衰减（老配方）
+                    float tail = Mathf.Min(1f, (perNote - i) / tailLen);    // ★ 段尾强制收到 0
+                    data[n * perNote + i] = Mathf.Sin(2f * Mathf.PI * notes[n] * t) * envelope * tail * 0.3f;
+                }
+            }
+            _gameWin = Build("GameWin", data);
+        }
+        return _gameWin;
+    }
+
 
     // ── 公共尾部：造空唱片 + 灌采样点 ───────────────────────────
     private static AudioClip Build(string name, float[] data)
