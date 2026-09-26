@@ -797,6 +797,98 @@ Mathf.Abs(a - b) < 0.0001f // ✅ 判"差值足够小"
 
 答案在**开头** / **末尾** / **中间**、`0` 参与（验证 `a ^ 0 = a`）、**负数**（异或对符号位同样成立）、**单元素**、**长数组**
 
+## 30. 接口 vs 抽象类 vs 具体类 · 泛型变型（09-26）
+
+> 承接：第 22 章（接口）/ 第 24 章（抽象类）/ 09-08 的 `IReadOnlyList<T>`。
+> 起因：`49` 的方法签名是 `IList<IList<string>>`，写实现时撞上「`List<List<string>>` 转不过去」。
+> **实测记录**：临时工程编译 → `error CS0266`；下面三套可行写法均跑通（0 警告 0 错误）。
+
+### 一、三个「不能 new 的家伙」排一排
+
+| | 接口 `interface` | 抽象类 `abstract class` | 具体类 `class` / `List<T>` |
+|---|---|---|---|
+| 有实例字段（状态）吗 | ❌ 没有 | ✅ 有 | ✅ 有 |
+| 有实现代码吗 | ❌ 只有签名（C#8 起可有默认实现） | ✅ 部分有（抽象成员留给子类） | ✅ 全有 |
+| 有构造函数吗 | ❌ 没有 | ✅ 有，但**只能被子类 `base(...)` 调用** | ✅ 有，能直接调 |
+| 能 `new` 吗 | ❌ | ❌ | ✅ |
+| 一个类能用几个 | 可**实现多个** | 只能**继承一个** | —— |
+| 一句话 | 一张**资格证**（can-do） | 一个**没盖完的父类**（is-a） | 一栋**能住的房子** |
+
+⭐ **纠偏**：「不能 `new`」**不是接口的本质特征** —— 抽象类也不能 `new`（第 24 章 CS0144）。
+接口的本质是：**它不携带任何实例状态与实现，所以没有「实体」可造**（它是一份规则，不是一个东西）。
+
+### 二、接口变量的真相：左边是「窗」，右边是「房」
+
+```csharp
+IList<string> a = new List<string>();   // ⚠️ new 的是 List，不是 IList
+Console.WriteLine(a.GetType().Name);    // List`1   ← 运行时它【还是 List】
+Console.WriteLine(a is List<string>);   // True
+
+int[] arr = { 1, 2, 3 };
+IList<int> b = arr;                     // 数组也实现 IList<int>
+// 后续对 a / b 的代码完全一样：按下标读、看 Count
+```
+
+- **`new` 永远只发生在具体类上**；接口类型的变量里存的是「某个具体对象的引用」
+- 接口变量能**向下转回**具体类型（`(List<string>)a` 合法），因为对象自始至终是 `List`
+- 第 22 章的「能力面具」在这里补一句：**声明类型 = 你能看到的成员范围**。
+  `List` 里其实有 `Capacity` / `Sort` / `AddRange`，但戴着 `IList` 这副眼镜**看不见** —— 不是没有，是视角没有权限
+
+### 三、⭐ 泛型变型：`List<List<string>>` 为什么转不成 `IList<IList<string>>`
+
+**能不能「换个 T 用」，取决于 T 出现在什么位置**：
+
+| 接口 | T 的位置 | 变型 | 能否换 T |
+|---|---|---|---|
+| `IEnumerable<out T>` | **只出不进**（只被读） | **协变** covariant | ✅ `IEnumerable<List<string>>` → `IEnumerable<IList<string>>` |
+| `IList<T>` | **既进又出**（`Add(T)` 进 / `this[int]` 出） | **不变** invariant | ❌ 一律不行 |
+
+> 名词先认脸：**协变 out / 逆变 in / 不变（默认）**。逆变暂时没遇到，见过这个词即可。
+
+**为什么「不变」是必须的（反证法）**：假设 `IList<List<string>>` 能当 `IList<IList<string>>` 用 ——
+那别人就能往你这个「只装 `List<string>`」的容器里 `Add` 一个 `string[]`（数组同样是 `IList<string>`）
+→ 容器里混进异类 → 之后取出来当 `List<string>` 用就崩。**所以编译器在编译期就把这条路堵死。**
+
+**实测报错原样**：
+
+```
+Program.cs(4,26): error CS0266: 无法将类型“List<List<string>>”隐式转换为
+                               “IList<IList<string>>”。存在一个显式转换(是否缺少强制转换?)
+```
+
+**三条能编译通过的写法（均已实证）**：
+
+```csharp
+var map = new Dictionary<string, List<string>>();               // 内部：具体类型，方便 Add
+map["aet"] = new List<string> { "eat", "tea" };
+
+IList<IList<string>> r1 = new List<IList<string>>(map.Values);  // ⭐ 借 List<T> 构造函数 + 协变
+IList<IList<string>> r2 = new List<IList<string>>();            // 或者建好容器逐组 Add
+r2.Add(new List<string> { "eat", "tea" });                      // List<string> → IList<string> 是【直接实现】
+IEnumerable<IList<string>> r3 = map.Values;                     // 契约只要 IEnumerable 就能直接赋
+```
+
+- 路线 1 的关键：`List<T>` 的构造函数吃 `IEnumerable<T>` → **协变在实参那一层生效**
+- 路线 2 的关键：`List<string>` 本来就 `implements IList<string>`，**这是直接实现、不是协变**（两者别混）
+- ⚠️ **协变只对引用类型生效**：`IEnumerable<int>` 转不成 `IEnumerable<object>`
+  （值类型之间没有引用转换；真允许了就得装箱，而装箱会让「只读」的保证失效）
+
+### 四、工程尺子：对外收窄，对内放开
+
+```csharp
+public IList<IList<string>> GroupAnagrams(string[] strs)   // 对外：接口，够用就行
+{
+    var map = new Dictionary<string, List<string>>();      // 对内：具体类，怎么顺手怎么来
+    // ...
+}
+```
+
+- **对外**（方法参数 / 返回值 / 字段）→ 用**接口**：换实现不改签名，调用方不被绑死
+- **对内**（局部变量）→ 用**具体类**：接口视角看不到 `List` 的 `Capacity` / `Sort` / `AddRange`
+- 只读场景优先 `IReadOnlyList<T>`（09-08）：**比 `IList<T>` 更能表达「我不会改你」的意图**
+- 冷知识：**数组 `string[]` 也实现 `IList<string>`**，但它长度固定 → 对它 `Add` 直接抛
+  `NotSupportedException`（「契约承诺了、实现用异常顶回来」，所以拿到接口别假定什么都支持）
+
 ## （原第 29 章 · 09-19 已迁出）Unity 输入与物理
 
 > 📌 2026-09-19 已拆分到 **[Unity-基础笔记.md](Unity-基础笔记.md)**（本册第 3 章）。
@@ -815,3 +907,5 @@ Mathf.Abs(a - b) < 0.0001f // ✅ 判"差值足够小"
 - [ ] **Unity 相关回访项已迁移** → 见 [`Unity-基础笔记.md`](Unity-基础笔记.md) 的「回访清单」（`TransformProbe`/实验 5/坐标实践/手感实验/双时钟顺序/边界 Clamp/Body Type 对照/新输入系统/Prefab 同步等）
 - [ ] **219 滑动窗口 Set 版（09-21 记）**：窗口里只留最近 k 个元素（超出就 `Remove` 最老的），空间 O(k)；对照"字典存最新下标"的 O(n) —— 面试常追问"k 很小 / 数据是流式怎么办"（顺延，不占 Block 2 时间）
 - [ ] **表达式主体成员 vs Lambda（09-21 记）**：等 Block 3 学完**委托/事件**后回来重看一眼本册第 15 章的 `=> 表达式` —— 同一个箭头符号，一个编译成普通方法、一个生成委托对象，届时要能一眼区分
+- [ ] **`49` 进阶①（09-26 记）**：`int[26]` 计数表当 `Dictionary` 的 key —— `int[]` 是引用类型、默认比引用（比的是地址），怎么把它「变成能比相等的东西」？（拼成字符串 / `ValueTuple` / 自定义 `IEqualityComparer`）AC 后回来试一版 **O(n·k)** 解法，对照排序版的 O(n·k log k)
+- [ ] **变型的实战回收（09-26 记）**：把某个方法的参数从 `List<T>` 收窄成 `IEnumerable<T>`（承 09-16 那条）→ 体会「对外收窄、对内放开」；顺带确认自己没在返回值上暴露 `List<T>`
