@@ -1,13 +1,14 @@
 ﻿using TMPro;                            // ★ 结果文本用 TMP_Text（09-23 的老朋友）
 using UnityEngine;
 using UnityEngine.SceneManagement;      // ★ 场景重载在 SceneManagement 里（今天的主角）
+using System;                           // ★ 新增：Action 在 System 命名空间里
 
 // ═══════════════════════════════════════════════════════════════════
 //  GameManager —— 唯一的"裁判"（方案甲 · 状态派生）
 //
 //  依赖方向（箭头读作"知道"）：GameManager ─→ BrickSpawner（只读状态）
 //                                        └─→ ScoreManager（只写显示）
-//  ★ 两个小弟谁都不认识对方，也不认识裁判。全场只有裁判知道"这一局怎么样了"。
+//  ★ 09-28 起：裁判连 ScoreManager 这个【类】都不认识了，只认识"一个能吃 int 的签名合同"。
 //
 //  为什么分数是"派生"的：分数 = f(剩余砖块数)，不需要任何"谁打了我一块"的事件。
 //  从状态重算 → 天然幂等（喊一次和喊一百次结果一样）→ 少一条链路就少一类 bug。
@@ -22,6 +23,9 @@ public class GameManager : MonoBehaviour
 
     private bool _isGameOver = false;             // ⭐ 今天最重要的一个字段
 
+    // ★ 新增：裁判现在只认"一个能吃 int 的回调"——它不再认识 ScoreManager 这个类
+    private Action<int> _notifyScore;
+
     // ─────────────────────────────────────────────────────────────
     // TODO 1：开局准备
     //   void Start()
@@ -35,7 +39,19 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         overlay.SetActive(false);
+
+        // ★ 新增：装配（把 ScoreManager 的方法塞进委托空位）
+        //   ① 防线放在【装配之前】——"必须有人接"的接线，缺了要【响亮地失败】（09-24 那条纪律）
+        //   ② 为什么装配放 Start 不放 Awake？（提示：Awake 阶段别的物体可能还没就位）
+        if (scoreManager == null)
+        {
+            Debug.LogError("GameManager 引用缺失：请在检查器里挂上 scoreManager", this);
+            enabled = false;
+            return;
+        }
+        _notifyScore = scoreManager.SetDestroyedCount;   // 方法组 → 委托实例
     }
+
     // ─────────────────────────────────────────────────────────────
     // TODO 2：⭐ 每帧检查一次"这一局还在不在"
     //   void Update()
@@ -71,7 +87,7 @@ public class GameManager : MonoBehaviour
             return;
         }
         if (brickSpawner.TotalBricks == 0) return;
-        scoreManager.SetDestroyedCount(brickSpawner.TotalBricks - brickSpawner.RemainingBricks);
+        _notifyScore?.Invoke(brickSpawner.TotalBricks - brickSpawner.RemainingBricks);
         if (brickSpawner.RemainingBricks == 0) Win();
     }
     // ─────────────────────────────────────────────────────────────
