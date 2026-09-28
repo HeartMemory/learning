@@ -1450,12 +1450,15 @@ if (brickSpawner == null || scoreManager == null)
 
 ```yaml
 # Projects/Unity/<项目>/ProjectSettings/ProjectSettings.asset
-  organizationId: REDACTED     # ← Unity 登录账号后自动写入，中间那串是手机号
+  organizationId: q<手机号>mtu…            # ← Unity 登录账号后自动写入，中间那串是手机号（**实际值已脱敏，不落纸**）
 ```
 
 - **它必须入库**（`ProjectSettings` 是项目能不能跑的一部分，**不能 gitignore 掉**）→ 所以**账号信息会跟着进 git**
 - 本次事故：09-18 首次提交就带上它 → **公开仓库的历史里能搜到**
 - **处理**：`git filter-repo --replace-text`（替换成 `REDACTED`）→ 空提交留标记 → **强推**（远端 hash 全改写）
+- ⚠️ **09-28 补记（第二次踩）**：事故后写复盘 / 笔记时，又把**脱敏前的原值原样抄进了正文**（本册与当日复盘各一处）→ 跟着提交推了上去 = **把手洗过的水又泼回来**
+  - **教训**：① 脱敏要连**正文里的引用**一起改 —— 写笔记时直接用 `q<手机号>mtu…` 这种占位，**永不写原文** ② **自查必须扫"全部暂存内容"**，不是只看 `ProjectSettings.asset` 那一个文件 ③ 自查正则**别用 `\b`**（手机号紧跟在字母后，`\b` 不成立 → 漏报）
+  - **现状**：本机已装 **`pre-commit` 钩子**，提交时扫描**全部暂存内容**（命中非空 `organizationId` 或手机号形态的 11 位数字 → 直接拒绝提交）
 - **长期防复发**：新项目第一次提交前自查
   ```powershell
   git diff --cached | Select-String "organizationId"      # 期望：无输出
@@ -1471,6 +1474,55 @@ if (brickSpawner == null || scoreManager == null)
 | 加了音效却**听不到 / 只有一声** | 效果器（`AudioSource`）个数不够 / 同相位叠加 | 数场景里 `AudioSource` 的个数 |
 | `CompareTag` 报 `Tag: xxx is not defined` | 标签**没建**或名字拼错 | 打开 `ProjectSettings/TagManager.asset` 对照 |
 | 检查器改回 8×4，脚本里 `= 8` 却"没生效" | **面板值属于场景文件**，脚本默认值只在第一次挂载生效 | 改检查器 + **场景 `Ctrl+S`** |
+
+## 12. 委托做回调：装配期 vs 运行期（09-28）
+
+### 一、这次改了什么（**纯内部重构，观感零变化**）
+
+- **改前**：`GameManager.Update()` 里直接 `scoreManager.SetDestroyedCount(...)` —— 裁判**认识** `ScoreManager` 这个类
+- **改后**：裁判只持有 `private Action<int> _notifyScore;`，在 `Start()` 里用**方法组**装配，`Update()` 里只喊委托
+  ```csharp
+  private Action<int> _notifyScore;                       // 只认"一个能吃 int 的签名合同"
+  void Start()   { _notifyScore = scoreManager.SetDestroyedCount; }   // 方法组 → 委托实例
+  void Update()  { _notifyScore?.Invoke(brickSpawner.TotalBricks - brickSpawner.RemainingBricks); }
+  ```
+- **依赖方向变成了**：`GameManager ─→ BrickSpawner（读状态）` ＋ `GameManager ─→ Action<int>（一个合同，不知道背后是谁）`
+- ⚠️ **不是"事件总线"**：分数仍然是 `f(剩余砖块)` 的**派生量**（第 9 章第二节的方案甲没动），委托只是把"通知这一跳"从"认类"换成"认签名"
+
+### 二、⭐ 装配期检查 vs 运行期检查（今天最值得带走的一条）
+
+| 何时查 | 查什么 | 查不到怎么办 |
+|---|---|---|
+| **`Start`（装配期，一次）** | "**必须有人接**"的接线（`scoreManager == null` → 装配根本不成立） | **响亮地失败**：`Debug.LogError(..., this)` + **`enabled = false`**（不关掉自己就会每帧刷同一行红字，把真正的错误淹掉） |
+| **`Update`（运行期，每帧）** | 每帧真的要读的**状态源**（`brickSpawner == null`） | 同上 |
+
+- 两边都查不算错，但会让你分不清"**接线坏了**"还是"**运行中数据坏了**"
+- `_notifyScore?.Invoke(...)` 里的 **`?.`** 防的是"**没人订阅**"（字段为 null）：
+  - **通知类**（可选旁路）→ 允许安静跳过
+  - **接线类**（必须有人接）→ 必须响亮失败（所以 `Start` 那道防线不能省）
+- ⚠️ **委托可以为 null 的根源**：`+=`/`-=` 底层是 `Delegate.Combine/Remove` **造新对象再赋回** → 减空之后变量就是 null（编译器给 `CS8602` 警告正是这件事）
+
+### 三、⚠️ 委托**不能**序列化 —— 所以永远拖不进检查器
+
+- Unity 的序列化只认它认识的类型（`UnityEngine.Object` 引用 / 基元类型 / 标了 `[Serializable]` 的类或结构…）→ **`Action<int>` / 自定义委托都不在其中** → 委托字段**只能在代码里装配**
+- 想在**面板上拖** → 就得换成 **`UnityEvent`**：它是 **Unity 自己的类型**、可序列化、能存进场景文件；代价是更重（反射调用 + 手动配置）
+- 因此 `[SerializeField] private ScoreManager scoreManager;` **要保留**：它是**装配用的插头**，只是不再出现在每帧路径上
+
+### 四、验收五步（改完必走 —— 这是"改造纪律"，不是建议）
+
+1. **编译**：Console **0 红字**；判据 = `Library/ScriptAssemblies/Assembly-CSharp.dll` 时间戳**晚于**源码
+2. **保存**：脚本 `Ctrl+S`（本次不新增序列化字段 → 场景层不用存，检查器接线原样保留）
+3. **通关路径（全场最难走的分支）**：把 `BrickSpawner` 的 **`cols` / `rows` 临时改成 2 / 2** → 打光 4 块 → 应得 **40 分 + `YOU WIN` + 上行三音 + 黑幕淡入 + 按钮可点**
+   - ⚠️ 验完**立刻改回 `8` / `4` 并保存场景**（`Ctrl+S`）—— 面板值属于**场景文件**（第 11 章第六节）
+4. **失败 + 重开**：漏球 → `GAME OVER` + 下滑音 → 点 `RESTART` → **新一局能正常玩**（`timeScale` 那笔静态账）
+5. **观感确认**：分数照旧每块 +10、无闪烁无重复音 → **纯内部重构 → 09-26 的录屏仍是作品集版本，不重录**
+
+### 五、工程习惯（09-28 新增）
+
+- ⚠️ **`ProjectSettings.asset` 的 `organizationId` 会被 Unity 自动写回**：登录态下**打开项目就写**（不是"点了保存"才写）→
+  - 提交前 `git status` **逐文件**看；出现该文件就 `git restore <显式路径>` 丢弃（**禁用 `git restore .`**）
+  - **绝不对 Unity 项目做目录级 `git add`**（`git add Projects/Unity/<项目>/` = 把脏值带进提交的手法）→ **只 add 明确的那个脚本文件**
+- ✅ 兜底闸门：本机已装 **`pre-commit` 钩子**（提交时扫描暂存内容，命中非空 `organizationId` 或手机号形态 → 拒绝提交）
 
 ## 📎 环境与工具备忘（Unity 部分）
 
@@ -1527,6 +1579,9 @@ if (brickSpawner == null || scoreManager == null)
 - [ ] **撞墙音（09-26 记，本期决定先不做）**：一局要响几十次 → 很多商业 Breakout **故意不做**（这是设计取舍，不是欠账）。真要做：① 给 `Left/Right/Top` 建 **`Wall` 标签**（⚠️ 项目设置层 → **文件 → 保存项目**）② `Sfx.WallHit()` 做成"短、低、闷"（如 180Hz / 0.05s）且**必须缓存**（它是全场触发最频繁的音）③ 走"**球主动判**"路线（`BallController` 里用 guard clause 分派，**复用球身上那个 `AudioSource`**），不用给三面墙各挂脚本 + 各挂 `AudioSource`（容器没有碰撞体，挂在容器上收不到回调）
 - [ ] **素材收尾与素材化（09-26 记）**：① 录制时若临时调小过砖块数，**收工前一定改回 8×4 + 场景 `Ctrl+S`**（面板值属于场景文件，见第 11 章第六节）② 想把 `YOU WIN` 也纳入作品集 → 另录一段 ≤10 秒"通关小片"（临时 8×2 观感更好，**别用 1×2** 那种看不出砖墙的样子）③ 程序化音效只是"零素材时能立刻听到声音"的方案，正式作品集可换**真实素材文件**
 - [ ] **结算遮罩的观感（09-26 记）**：结算截图显示黑幕（`A ≈ 0.588`）会把砖块压成灰色 → 想一想"结算时背景该压多暗 / 要不要虚化"（纯表现层的参数决策，没标准答案，但要有意识）
+- [x] ~~**把"分数通知"改成回调（09-28）**~~（**09-28 完成 ✓**：`GameManager` 持 `Action<int>` + 方法组装配 + `?.Invoke`；"必须有人接"的检查收进 `Start`、`enabled = false` 响亮失败。见本册第 12 章）
+- [ ] **`UnityEvent` 对照（09-28 记）**：委托**不能序列化** → 想在检查器里配就得用 `UnityEvent`（Unity 自己的可序列化类型）；将来做"设置面板 / 按钮事件集中管理"时对照一次，体会"能在面板上拖"换来的代价（反射调用 + 手配）
+- [ ] **把 `FailZone → GameManager` 也改成事件（09-29 计划）**：目前 `FailZone` 直接调 `gameManager.OnBallLost()` → 换成 `public event Action OnBallLost`（外部只能 `+=`/`-=`，**不能赋值清空**），顺带练**退订**（`OnDestroy` 里 `-=`）与"谁该负责退订"
 - [ ] **通关音 vs 失败音（09-25 记）**：声音搬到 `End()`（唯一出口）后，**两条路径共用了同一个下滑音** → 通关也该有"上扬音"；解法是把签名改成 `End(string message, AudioClip sound)`：**通用动作留出口，各自数据由入口传参**
 - [ ] **音效变体铺开 + 音效池（09-25 记）**：现在只有撞砖做了 3 个音高变体 → 挡板/结算也做；再体会"同时发声上限"与"多个 `AudioSource` 轮询（voice pool）"
 - [ ] **音量统一管理（09-25 记）**：三处各自 `Volume = 1` → 引入 **`AudioMixer`** 做 `BGM` / `SFX` 分组与总音量（设置界面要用）

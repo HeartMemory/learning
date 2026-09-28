@@ -19,6 +19,7 @@
 | 2026-09-09 | 继承入门（提前）+ this/base 专题 | Character/Hero/Party：base(...) 构造链 / this(...) 构造链 / this 传参（party.Add(this)）/ get-only 属性与 private set 封装墙 | [2026/09/09/Inheritance](2026/09/09/Inheritance/) |
 | 2026-09-11 | 继承正课：protected 访问级别 | 三种访问级别家族模型（private 日记 / protected 传家宝 / public 公告栏）+ HP `{ get; protected set; }`：子类可写外界不可（Sacrifice 献祭场景 + 编译错误实感） | [2026/09/11/Protected](2026/09/11/Protected/) |
 | 2026-09-11 | 多态（提前消化 09-12） | 角色类多态：virtual/override/base.成员 → **钩子模式重构**（骨架锁流程 + `protected virtual OnHit()` 开细节），基底版先 commit 存档再重构 | [2026/09/11/Polymorphism](2026/09/11/Polymorphism/) |
+| 2026-09-28 | **委托 delegate**（Block 3 首课） | 自定义委托 `MathOp`（声明 / 方法组实例化 / 调用）+ **多播**（`+=`/`-=`，两个都执行但只拿到最后一个返回值）+ `Action` / `Func` / 谓词 + **委托当参数 = 回调**（`Aggregate`）+ **`ScoreBoard` 注入通知者**模型（与 Breakout 的 `GameManager → Action<int>` 同构）；顺带实证：`Invoke` 是编译器生成的成员、委托是名义类型不能互转、`x(args)` = `x.Invoke(args)` | [2026/09/28/Delegates](2026/09/28/Delegates/) |
 
 ## 里程碑成品（`Projects/CSharp/`）
 
@@ -28,7 +29,7 @@
 - [StringToolbox](../Projects/CSharp/StringToolbox/)：字符串工具箱收官版（五功能全方法化 + 重载 + 输入重试上限 + null 防御）
 - [CharacterBattle](../Projects/CSharp/CharacterBattle/)：**角色对战模拟器**（第 5 号成品）——继承 + 多态（`List<Character>` 混装）+ 钩子模式（CalcDamage）+ 封装（`protected set`）+ 静态统计 + 战斗主循环 + **接口 `IAttackable`**（09-14：宝箱不继承 Character 也能挨打，`Attack` 参数换成接口）+ **09-15 重构三部曲**：`abstract class`（不可实例化）→ **参数化**（技能名/加成作构造参数，消灭 `if (Name == ...)`）→ **公共上提父类**（Hero/Monster 各只剩构造函数，`abstract` 退位为普通方法）
 
-## 后续计划（Block 1 剩余 + Block 2）
+## 后续计划（Block 2 已收官 · 当前 Block 3）
 
 - [x] 09-07~09-08：OOP 第一课（类/构造/属性）+ 静态成员 + 封装收尾（超前完成）
 - [x] 09-09 晚：继承起步 + this/base 专题（Inheritance 练习，超前完成——09-10 补课勾销）
@@ -37,4 +38,5 @@
 - [x] 09-11：protected 访问级别 + **多态**（virtual/override/base.成员 + 钩子模式）——均已完成（多态提前一天）
 - [x] 09-12：🏆 **角色类多态小 demo**（CharacterBattle 成品完成，第 5 号）
 - [x] 09-13（周日）：复盘日 → **产出 Block 2 详细计划**（09-14~09-27，见 `Notes/2026/09/13.md`）
-- [ ] **Block 2（09-14~09-27）**：接口/抽象类 → 09-17 **Unity 正式开始** → 泛型/Dictionary → 🏆 **2D 打砖块**（对象池回收 + Animator 动画 + UGUI 计分 + **录屏 ≤30 秒 + 3 截图存档 demos/**）
+- [x] **Block 2（09-14~09-27）**：接口/抽象类 → 09-17 **Unity 正式开始** → 泛型/Dictionary → 🏆 **2D 打砖块**（对象池回收 + Animator 动画 + UGUI 计分 + **录屏 ≤30 秒 + 3 截图存档 demos/**）—— **09-27 收官 ✓**（全勤、无顺延）
+- [ ] **Block 3（09-28~10-11）**：**委托**（09-28 ✓）→ **事件** → **Lambda** → 泛型收口 → 文件读写 / 异常 / LINQ（用在第 7 号成品「2D 平台跳跃」的**存档**上）；C# 新特性一律先在**已入库旧项目**上做纯内部重构验证

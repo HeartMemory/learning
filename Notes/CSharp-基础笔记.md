@@ -2,7 +2,7 @@
 
 > 学习过程中的知识点沉淀，按主题组织，随进度更新。
 > 代码实例都在 `CSharpPractice/` 对应日期目录里，可运行验证。
-> 覆盖进度：第 1-7 章 = 语言基础；第 8 章 = 踩坑；第 9-13 章 = 字符串/方法/静态成员；**第 14-21 章 = OOP 全家桶（类/引用/属性/封装/继承/多态/null/工程判断）**
+> 覆盖进度：第 1-7 章 = 语言基础；第 8 章 = 踩坑；第 9-13 章 = 字符串/方法/静态成员；**第 14-21 章 = OOP 全家桶（类/引用/属性/封装/继承/多态/null/工程判断）**；第 22-24 章 = 接口/哈希/抽象类；第 27-31 章 = 计基随行与进阶（堆栈/浮点/位运算/泛型变型/**委托**）
 > ⚠️ **Unity 相关内容（原第 25/26/29 章）已于 2026-09-19 拆分到 [`Unity-基础笔记.md`](Unity-基础笔记.md)**：本册只留 C# 语言 + 计基随行；编号保留空位，便于历史复盘里的「第 25/26/29 章」引用仍能对上。
 
 ## 1. 变量与类型（Day 1）
@@ -972,6 +972,96 @@ public IList<IList<string>> GroupAnagrams(string[] strs)   // 对外：接口，
 - 冷知识：**数组 `string[]` 也实现 `IList<string>`**，但它长度固定 → 对它 `Add` 直接抛
   `NotSupportedException`（「契约承诺了、实现用异常顶回来」，所以拿到接口别假定什么都支持）
 
+## 31. 委托 delegate（09-28 · Block 3 首课）
+
+### 一、一句话 + 生活模型
+
+- **委托类型 = 一份「方法签名的合同」**；**委托实例 = 一个可以传来传去的「方法」**
+- 平时写 `Calculator.Add(3, 4)` 是**点名叫人干活**（写代码那一刻就必须知道是谁）；
+  委托是**先留一个空位**，具体塞哪个方法**运行时由调用方决定** → 这就是 **回调（callback）**
+- 好处：调用方与被调用的方法**互相不需要认识**，只认那份签名合同
+
+### 二、声明与实例化是两个动作（别混）
+
+```csharp
+public delegate int MathOp(int a, int b);   // ① 声明【类型】（≈ class 声明）：只有签名 + 分号，【没有方法体】
+MathOp op = Calculator.Add;                 // ② 造【实例】（≈ new 对象）：方法组 → 委托实例（隐式转换）
+// MathOp op = new MathOp(Calculator.Add);  //    显式写法，两种等价
+op(3, 4);                                   // ③ 调用：完全等价于 op.Invoke(3, 4)
+```
+
+- ⚠️ 声明写成 `{ }` → `CS1519 / CS1002`；漏写返回类型（`delegate MathOp(...)`）→ `CS0246`（自己引用自己，绕）
+- **类型一天只声明一次，实例到处能造** —— 前者像 `class`，后者像 `new`
+
+### 三、`Invoke` 是谁？—— 编译器自动生成的成员（09-28 反射实测）
+
+`delegate` 其实是"**请编译器帮我造一个类**"的命令：生成的类型隐式继承 `MulticastDelegate`，并**自带** `Invoke`。
+
+| 反射实测（可自己跑） | 输出 |
+|---|---|
+| `typeof(MathOp).GetMethod("Invoke")` | `Int32 Invoke(Int32, Int32)` |
+| `typeof(Action<int>).GetMethod("Invoke")` | `Void Invoke(Int32)` |
+| `typeof(Func<int,int,int>).GetMethod("Invoke")` | `Int32 Invoke(Int32, Int32)` |
+| `op.Method` / `op.Target` | `Int32 Add(Int32, Int32)` / 空（**静态方法没有目标对象**） |
+| `chain.GetInvocationList().Length`（多播 2 个） | `2` |
+
+- 所以 **`x(args)` 与 `x.Invoke(args)` 是同一个调用**，前者是编译器帮你省掉 `.Invoke` 的简写
+- 同类"你没写但它存在"：**自动属性** → 隐藏字段 + `get_/set_`；**`event`**（09-29）→ `add_/remove_`；**`foreach`** → `GetEnumerator/MoveNext`
+- 📎 只做了解：老 IL 里 `Invoke` 旁边的 `BeginInvoke/EndInvoke`（异步调用）在 **.NET Core 起已不支持**（调用抛 `PlatformNotSupportedException`），看到旧代码知道是历史遗留即可
+
+### 四、内置委托：`Action` / `Func`（官方推荐，能不自声明就不声明）
+
+| 写法 | 签名 | 用途 |
+|---|---|---|
+| `Action` | 无参、无返回 | 触发一个动作 |
+| `Action<T1, T2…>` | 吃 N 个，**无返回**（最多 16 个） | **通知 / 回调 / 广播 —— 多播首选** |
+| `Func<TResult>` / `Func<T1,…, TResult>` | 有返回，**最后一个泛型参数 = 返回类型** | 计算 / 映射 / 谓词 |
+
+- `Func<int,int,int>` = 吃两个 int 返回 int；`Func<int,bool>` = 谓词（predicate）
+- **判据**：签名**有语义**（`OnGameOver`、`ValidateInput`）→ 自己声明；**纯技术性"吃几个还一个"** → `Action`/`Func`
+- **自己声明过一次的价值**：知道 `Func`/`Action` 不是魔法，只是"别人替你写好的那行 `delegate`"
+
+### 五、多播：`+=` / `-=` 的四条语义
+
+1. `+=` 是**加**不是**换**；`-=` 是**减**
+2. ⭐ **链上每个方法都会执行，但只拿得到最后一个的返回值**（链尾覆盖前面）→ 多播 + 有返回值 = 用错了
+3. `+=`/`-=` **不是"往列表里追加"**：底层是 `Delegate.Combine/Remove` **生成新的委托对象再赋回** → 所以 `-=` 之后变量**可能变成 null**（编译器给 **CS8602** 警告的正是这件事）
+4. `Invoke` 顺链执行 = `GetInvocationList()` 的天然遍历
+
+### 六、两条硬边界
+
+1. **委托可以是 null** → 调用点写 **`del?.Invoke(x)`**；直接 `del(x)` 在无人订阅时就是 `NullReferenceException`
+   - **判据（今天从 Unity 侧回填）**：**通知类旁路**（可选）→ 允许**安静跳过**；**接线类**（必须有人接）→ **装配期响亮失败**（`Debug.LogError(..., this)` + `enabled = false`）
+2. **名义类型**：签名一样也**不能互相赋值** —— `MathOp` / `Func<int,int,int>` / `Action<int,int>` 是三个不同的类型
+   ```csharp
+   MathOp op = Calculator.Add;
+   Func<int,int,int> f  = op;                            // ❌ CS0029（哪怕签名一模一样）
+   Func<int,int,int> f2 = new Func<int,int,int>(op);     // ✅ 显式"重新包一层"（09-30 的 lambda 也常这么用）
+   ```
+
+### 七、落点：把"通知"做成回调（与 Unity 侧同构）
+
+```csharp
+public class ScoreBoard {
+    public Action<int>? OnScoreChanged;      // ⚠️ 先故意写成 public 字段（外部能 `= null` 清掉别人的订阅）—— 09-29 的 event 就是来上这把锁
+    private readonly int _scorePerBrick;
+    private int _score;
+    public ScoreBoard(int scorePerBrick, Action<int> onScoreChanged) {
+        _scorePerBrick = scorePerBrick;
+        OnScoreChanged = onScoreChanged;     // ③ 构造函数只【转存】，不决定用哪个方法
+    }
+    public int Score => _score;
+    public void AddBricks(int count) {
+        _score += count * _scorePerBrick;    // ① 先改【状态】
+        OnScoreChanged?.Invoke(_score);      // ② 后播【副作用】—— 顺序反了，通知里读到的就是上一轮的旧值
+    }
+}
+```
+
+- **谁指定方法**：调用方（`new ScoreBoard(10, Calculator.ReportScore)`）→ 构造函数**转存** → `AddBricks` **只执行、不决定**
+- **解耦的可验证判据**：换一个"通知者"方法传进去，输出格式变了而 `AddBricks` **一行都不用改**
+- 与 09-24 / 09-26 的两条纪律同源：**先改状态、最后播副作用** ｜ **锁（守卫）必须罩住副作用**
+
 ## （原第 29 章 · 09-19 已迁出）Unity 输入与物理
 
 > 📌 2026-09-19 已拆分到 **[Unity-基础笔记.md](Unity-基础笔记.md)**（本册第 3 章）。
@@ -992,3 +1082,7 @@ public IList<IList<string>> GroupAnagrams(string[] strs)   // 对外：接口，
 - [ ] **表达式主体成员 vs Lambda（09-21 记）**：等 Block 3 学完**委托/事件**后回来重看一眼本册第 15 章的 `=> 表达式` —— 同一个箭头符号，一个编译成普通方法、一个生成委托对象，届时要能一眼区分
 - [ ] **`49` 进阶①（09-26 记）**：`int[26]` 计数表当 `Dictionary` 的 key —— `int[]` 是引用类型、默认比引用（比的是地址），怎么把它「变成能比相等的东西」？（拼成字符串 / `ValueTuple` / 自定义 `IEqualityComparer`）AC 后回来试一版 **O(n·k)** 解法，对照排序版的 O(n·k log k)
 - [ ] **变型的实战回收（09-26 记）**：把某个方法的参数从 `List<T>` 收窄成 `IEnumerable<T>`（承 09-16 那条）→ 体会「对外收窄、对内放开」；顺带确认自己没在返回值上暴露 `List<T>`
+- [ ] **`GetInvocationList()` 未动手（09-28 记）**：在多播委托上遍历 `GetInvocationList()`，亲手拿到"链上每个方法" → 由此解释"多播为什么只返回最后一个的返回值"（第 31 章第五节）
+- [ ] **`MathOp` → `Func<int,int,int>` 改写（09-28 记）**：把 `CSharpPractice/2026/09/28/Delegates` 里的 `MathOp` 全换成 `Func<int,int,int>`——先**直接赋值**（应报 **CS0029 名义类型**），再**显式 `new Func<...>(op)` 包一层** → 一次体会"名义类型"与"官方预置"两条（第 31 章第四 / 六节）
+- [ ] **`144` 迭代版未写（09-28 记）**：用**显式栈**模拟调用栈；动手前先答——"栈是后进先出，而前序要先访问左 → **左右孩子谁先压栈？为什么？**"（`LeetCode/README.md` 里的算法验收③）
+- [ ] **给"通知字段"上锁（09-29 计划）**：`ScoreBoard` 的 `public Action<int>? OnScoreChanged` → `public event Action<int>`，体会"外部只能 `+=` / `-=`、**不能赋值清空**"；Breakout 侧同步把 `FailZone → GameManager` 那条线改成事件（见 `Unity-基础笔记.md` 回访清单）
