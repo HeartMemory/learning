@@ -19,6 +19,7 @@
 | 2026-09-09 | 继承入门（提前）+ this/base 专题 | Character/Hero/Party：base(...) 构造链 / this(...) 构造链 / this 传参（party.Add(this)）/ get-only 属性与 private set 封装墙 | [2026/09/09/Inheritance](2026/09/09/Inheritance/) |
 | 2026-09-11 | 继承正课：protected 访问级别 | 三种访问级别家族模型（private 日记 / protected 传家宝 / public 公告栏）+ HP `{ get; protected set; }`：子类可写外界不可（Sacrifice 献祭场景 + 编译错误实感） | [2026/09/11/Protected](2026/09/11/Protected/) |
 | 2026-09-11 | 多态（提前消化 09-12） | 角色类多态：virtual/override/base.成员 → **钩子模式重构**（骨架锁流程 + `protected virtual OnHit()` 开细节），基底版先 commit 存档再重构 | [2026/09/11/Polymorphism](2026/09/11/Polymorphism/) |
+| 2026-09-29 | **事件 event + 观察者模式**（Block 3 第 2 课） | `event` 的封装语义（外部只能 `+=` / `-=`；**赋值或调用 = CS0070**，报错原文括号里写着"从声明类型中使用时除外"）+ 多播实测：**执行顺序 = 订阅顺序**、**退订顺序随意但须同一方法实例**（lambda 不存实例就退不掉）+ `NewsChannel` / `Subscriber` **观察者模式**（发布者不认识订阅者）+ **退订实验**：未退订的临时对象仍能收到通知（订阅链持有它 → GC 不回收） | [2026/09/29/Events](2026/09/29/Events/) |
 | 2026-09-28 | **委托 delegate**（Block 3 首课） | 自定义委托 `MathOp`（声明 / 方法组实例化 / 调用）+ **多播**（`+=`/`-=`，两个都执行但只拿到最后一个返回值）+ `Action` / `Func` / 谓词 + **委托当参数 = 回调**（`Aggregate`）+ **`ScoreBoard` 注入通知者**模型（与 Breakout 的 `GameManager → Action<int>` 同构）；顺带实证：`Invoke` 是编译器生成的成员、委托是名义类型不能互转、`x(args)` = `x.Invoke(args)` | [2026/09/28/Delegates](2026/09/28/Delegates/) |
 
 ## 里程碑成品（`Projects/CSharp/`）

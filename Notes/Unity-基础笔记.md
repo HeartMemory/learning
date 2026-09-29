@@ -1524,6 +1524,61 @@ if (brickSpawner == null || scoreManager == null)
   - **绝不对 Unity 项目做目录级 `git add`**（`git add Projects/Unity/<项目>/` = 把脏值带进提交的手法）→ **只 add 明确的那个脚本文件**
 - ✅ 兜底闸门：本机已装 **`pre-commit` 钩子**（提交时扫描暂存内容，命中非空 `organizationId` 或手机号形态 → 拒绝提交）
 
+## 13. 漏球改事件广播：方向反转、退订与编译上下文（09-29）
+
+### 一、这次改了什么（**纯内部重构，观感零变化**）
+
+|  | 改前 | 改后 |
+|---|---|---|
+| 广播方式 | `FailZone` 直接调 `gameManager.OnBallLost()` | `FailZone` 声明 `public event Action BallLost;` → `BallLost?.Invoke();` |
+| 依赖方向 | `FailZone ─→ GameManager` | **`GameManager ─→ FailZone`（订阅）**；`FailZone ─→ 谁都不认识` |
+| 事件声明在谁身上 | —— | **发布者**（`event` 只能由声明它的类内部 raise → **发布者 = 声明者**） |
+
+`GameManager` 侧三处：新增 `[SerializeField] FailZone failZone;` → `Start()` 里防线 + `failZone.BallLost += OnBallLost;` → `OnDestroy()` 里 `if (failZone != null) failZone.BallLost -= OnBallLost;`
+
+### 二、⭐ 防线该属于哪一侧（今天最容易错的地方）
+
+| 角色 | 引用别人吗 | 需要防线吗 | 形态 |
+|---|---|---|---|
+| **发布者** | 谁都不引用 | **不需要** | `?.Invoke()` 兜"没人订阅"（通知是可选旁路，安静跳过合法） |
+| **订阅者** | 引用了发布者 | **需要** | `if (x == null) { Debug.LogError(…, this); enabled = false; return; }` |
+
+**今天的现场**：改造时把 `gameManager` 字段删了，却把那 5 行空引用检查留着、只把变量名改成 `failZone` → **CS0103**（`failZone` 是 GameManager 的字段名）→ 见 `错题本` 错误 20。
+
+> 判据：**"我必须认识谁"的那一侧才需要防线**；改方向时，**旧防线连同旧注释一起删**。
+
+### 三、⭐ 订阅 / 退订的配对判据
+
+| 订阅写在哪 | 退订就该写在哪 | 为什么 |
+|---|---|---|
+| `Start()` | `OnDestroy()` | 两者**都只执行一次** → 天生配对（当前工程就是这条） |
+| `OnEnable()` | `OnDisable()` | 两者会**反复成对触发**（物体被反复启停），必须成对 |
+| ❌ 错配（如 `OnEnable` + `OnDestroy`） | —— | **重复订阅 → 回调被调多次**（分数加两遍、音效响两声） |
+
+- **对象被销毁后重建**（含场景重载 = 按 `RESTART`）**不需要手写"重新订阅"**：新对象有自己的 `Start`，会自己订阅一次；旧对象走 `OnDestroy` 退订一次
+- ⚠️ **退订不能用 `?.` 简写**（`a?.B -= x` 语法不合法）→ 必须写 `if (a != null) a.B -= x;`
+- ⚠️ 而这个 `if (a != null)` 恰好也是 Unity"假 null"（对象已销毁）的正解 —— `?.` 只管字段本身是不是 null
+
+### 四、⚠️ Unity 的编译上下文与 nullable
+
+|  | 控制台练习项目 | Unity 生成的 `Assembly-CSharp.csproj` |
+|---|---|---|
+| `<Nullable>` | `enable`（我们手写的 csproj） | **未设置 = 关闭** |
+| 写 `Action?` | 合法，且**真的参与空分析**（09-28 那条 CS8602 就是它给的） | **CS8632 警告**："只能在 `#nullable` 注释上下文内使用" |
+| 结论 | —— | **注解能省就省；`?.` 该写还得写** |
+
+⭐ 记住这句：**注解（`?`）是给编译器的提示，`?.` 是运行时检查** —— 两件事，别混。
+
+### 五、改"事件接线"时的固定五步验收
+
+1. 脚本 `Ctrl+S` → Console **0 红字**；判据 = `Library/ScriptAssemblies/Assembly-CSharp.dll` 时间戳**晚于**源码
+   （⚠️ **日志尾巴可能是上一次失败的残留** —— 今天就是这样：修复后 `Editor.log` 里还留着旧的 `CS0103`）
+2. **新增了序列化字段 → 必须去检查器拖引用 + 场景 `Ctrl+S`**（面板值属于场景文件，第 11 章第六节）
+3. **用 YAML 追证接线**：先看 `xxx: {fileID: N}`，再查 `&N` 那个块的 `m_Script` guid 是否就是目标脚本 → 确认"拖对了对象"
+   （组件引用存的是**组件**的 fileID，`!u!114`；不是物体 `!u!1`——拖 GameObject 也行，Unity 会自动解析到它身上的组件）
+4. 回归**被影响的那条路径**（本次 = 漏球）：球掉下去 → 日志 `球掉进了 FailZone` → `GAME OVER` + 下滑音 + 黑幕淡入 + 按钮可点 → `RESTART` 新一局正常
+5. 确认**没顺手改坏别处**：本题的 `cols` / `rows` 仍是 **8 / 4**
+
 ## 📎 环境与工具备忘（Unity 部分）
 
 - **⚠️ 四层"保存"（09-22 起血泪，09-26 补齐第四层）**：① **脚本** → VS2022/CodeBuddy 里 `Ctrl+S`（`Assets/**/*.cs`）② **场景** → 场景窗口 `Ctrl+S`（`Assets/Scenes/*.unity`，**顺带记住：检查器里改的 `[SerializeField]` 值也存在这里**）③ **项目设置** → **文件 → 保存项目**（⚠️ **无快捷键，最容易漏**；存 `ProjectSettings/*.asset`：标签和层 / 输入管理器 / 物理设置 / **`organizationId`**…）④ **🆕 资产层** → `.anim` / `.controller` / Prefab / ScriptableObject **也不是自动写盘的**（同样靠"文件 → 保存"）。**只"内存里改了"不算数**：不落盘 → 关掉 Unity 就丢、`git status` 看不见、别人 clone 也没有
@@ -1581,7 +1636,8 @@ if (brickSpawner == null || scoreManager == null)
 - [ ] **结算遮罩的观感（09-26 记）**：结算截图显示黑幕（`A ≈ 0.588`）会把砖块压成灰色 → 想一想"结算时背景该压多暗 / 要不要虚化"（纯表现层的参数决策，没标准答案，但要有意识）
 - [x] ~~**把"分数通知"改成回调（09-28）**~~（**09-28 完成 ✓**：`GameManager` 持 `Action<int>` + 方法组装配 + `?.Invoke`；"必须有人接"的检查收进 `Start`、`enabled = false` 响亮失败。见本册第 12 章）
 - [ ] **`UnityEvent` 对照（09-28 记）**：委托**不能序列化** → 想在检查器里配就得用 `UnityEvent`（Unity 自己的可序列化类型）；将来做"设置面板 / 按钮事件集中管理"时对照一次，体会"能在面板上拖"换来的代价（反射调用 + 手配）
-- [ ] **把 `FailZone → GameManager` 也改成事件（09-29 计划）**：目前 `FailZone` 直接调 `gameManager.OnBallLost()` → 换成 `public event Action OnBallLost`（外部只能 `+=`/`-=`，**不能赋值清空**），顺带练**退订**（`OnDestroy` 里 `-=`）与"谁该负责退订"
+- [x] ~~**把 `FailZone → GameManager` 改成事件（09-29 计划）**~~（**09-29 完成 ✓**：方向反转 —— `FailZone` 成发布者（`public event Action BallLost`）、`GameManager` 订阅 + `OnDestroy` 里带 `if` 防线的退订；含一次 CS0103 教训（旧防线残留）与 CS8632（Unity 未开 nullable）。见本册第 13 章）
+- [ ] **"一对多"事件实战（09-29 记）**：`BallLost` 目前只有一个订阅者 → 找一次机会让同一次广播喂给**多个**订阅者（例如"漏球"同时触发 音效 + UI 文案 + 统计），亲身感受"发布者无感、订阅者各自处理"（可与 10-10 打磨日的音效/UI 分工合并做）
 - [ ] **通关音 vs 失败音（09-25 记）**：声音搬到 `End()`（唯一出口）后，**两条路径共用了同一个下滑音** → 通关也该有"上扬音"；解法是把签名改成 `End(string message, AudioClip sound)`：**通用动作留出口，各自数据由入口传参**
 - [ ] **音效变体铺开 + 音效池（09-25 记）**：现在只有撞砖做了 3 个音高变体 → 挡板/结算也做；再体会"同时发声上限"与"多个 `AudioSource` 轮询（voice pool）"
 - [ ] **音量统一管理（09-25 记）**：三处各自 `Volume = 1` → 引入 **`AudioMixer`** 做 `BGM` / `SFX` 分组与总音量（设置界面要用）
