@@ -6,13 +6,23 @@ using System;                           // ★ 新增：Action 在 System 命名
 // ═══════════════════════════════════════════════════════════════════
 //  GameManager —— 唯一的"裁判"（方案甲 · 状态派生）
 //
-//  依赖方向（箭头读作"知道"）：GameManager ─→ BrickSpawner（只读状态）
-//                                        └─→ ScoreManager（只写显示）
+//  依赖方向（箭头读作"知道"）：
+//      GameManager ─→ BrickSpawner（轮询只读状态：还剩几块砖）
+//                  ─→ Action<int>（一个签名合同，不认识背后的 ScoreManager 类）
+//                  ─→ FailZone（订阅它的 BallLost 事件）—— 09-29 新增
+//
 //  ★ 09-28 起：裁判连 ScoreManager 这个【类】都不认识了，只认识"一个能吃 int 的签名合同"。
+//  ★ 09-29 起：漏球不再由 FailZone 直接调裁判，而是【裁判主动订阅】FailZone 的事件
+//     （方向反转：发布者不认识订阅者，订阅者认识发布者）。
+//
+//  两条线、两种判据（同一天学的，别混）：
+//      · 分数 = f(剩余砖块数)  → 【持续状态】→ 每帧轮询 + 状态重算（天然幂等）
+//      · 球掉了                → 【瞬时事实】→ 事件广播（错过就没了）
 //
 //  为什么分数是"派生"的：分数 = f(剩余砖块数)，不需要任何"谁打了我一块"的事件。
 //  从状态重算 → 天然幂等（喊一次和喊一百次结果一样）→ 少一条链路就少一类 bug。
 // ═══════════════════════════════════════════════════════════════════
+
 public class GameManager : MonoBehaviour
 {
     [SerializeField] private BrickSpawner brickSpawner;   // 读状态：还剩几块砖
@@ -20,6 +30,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_Text resultText;         // 结果提示（YOU WIN / GAME OVER）
     [SerializeField] private GameObject overlay;
     [SerializeField] AudioSource audioSource;
+    [SerializeField] private FailZone failZone;           // ★ 新增序列化字段（下面第 3 步要接线）
+
 
     private bool _isGameOver = false;             // ⭐ 今天最重要的一个字段
 
@@ -50,6 +62,13 @@ public class GameManager : MonoBehaviour
             return;
         }
         _notifyScore = scoreManager.SetDestroyedCount;   // 方法组 → 委托实例
+        if (failZone == null)                            // ★ 新增：订阅（防线仍在【使用之前】——"必须有发布者"的接线）
+        {
+            Debug.LogError("GameManager 引用缺失：请在检查器里挂上 failZone", this);
+            enabled = false;
+            return;
+        }
+        failZone.BallLost += OnBallLost;                  // 订阅：方法组 → 委托，挂到事件上
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -146,4 +165,13 @@ public class GameManager : MonoBehaviour
         Time.timeScale = 1;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
+    void OnDestroy()
+    {
+        // ★ 退订：与 += 成对。
+        //   为什么要写？想想今天的练习 ③ 段：订阅链会一直牵着目标对象 ——
+        //   在 Unity 里，被销毁的对象仍挂在链上 → 下次通知时抛 MissingReferenceException，
+        //   而 `?.` 是防不住这种情况的（它只检查字段本身是不是 null）。
+        if (failZone != null) failZone.BallLost -= OnBallLost;
+    }
+
 }

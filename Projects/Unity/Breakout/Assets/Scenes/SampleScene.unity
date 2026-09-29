@@ -425,6 +425,7 @@ MonoBehaviour:
   resultText: {fileID: 1059338801}
   overlay: {fileID: 1534876730}
   audioSource: {fileID: 400841085}
+  failZone: {fileID: 1445518566}
 --- !u!4 &400841084
 Transform:
   m_ObjectHideFlags: 0
@@ -2252,7 +2253,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 981bcd6029d2d8f4cadbac1f528f6fd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FailZone
-  gameManager: {fileID: 400841083}
 --- !u!4 &1445518567
 Transform:
   m_ObjectHideFlags: 0
