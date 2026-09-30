@@ -19,6 +19,7 @@
 | 2026-09-09 | 继承入门（提前）+ this/base 专题 | Character/Hero/Party：base(...) 构造链 / this(...) 构造链 / this 传参（party.Add(this)）/ get-only 属性与 private set 封装墙 | [2026/09/09/Inheritance](2026/09/09/Inheritance/) |
 | 2026-09-11 | 继承正课：protected 访问级别 | 三种访问级别家族模型（private 日记 / protected 传家宝 / public 公告栏）+ HP `{ get; protected set; }`：子类可写外界不可（Sacrifice 献祭场景 + 编译错误实感） | [2026/09/11/Protected](2026/09/11/Protected/) |
 | 2026-09-11 | 多态（提前消化 09-12） | 角色类多态：virtual/override/base.成员 → **钩子模式重构**（骨架锁流程 + `protected virtual OnHit()` 开细节），基底版先 commit 存档再重构 | [2026/09/11/Polymorphism](2026/09/11/Polymorphism/) |
+| 2026-09-30 | **Lambda / 匿名方法 / 闭包**（Block 3 第 3 课） | 三种写法（表达式 / 语句 / 无参 lambda）+ **匿名方法**（`delegate (int x) { return x * 3; }`，C# 2.0 前身，与 lambda 可互换）+ ⭐ **闭包实测**：`bump.Method.DeclaringType` = `Program+<>c__DisplayClass0_0`、`Target` 上躺着 `Int32 counter` / `Int32 shared` → **被捕获的局部变量被提升为显示类字段**（生命周期延长、同作用域共用一个显示类、`Target` 就是它）+ 两个经典坑：**`for` 捕获三行都是 3**（修法：循环体内 `int copy = i;`——"变量共享 + 延迟读"缺一不可）／**捕获的是变量不是值** + 判据：**要用 lambda 订阅事件，必须先把它存进变量**（现写的退不掉） | [2026/09/30/LambdaClosures](2026/09/30/LambdaClosures/) |
 | 2026-09-29 | **事件 event + 观察者模式**（Block 3 第 2 课） | `event` 的封装语义（外部只能 `+=` / `-=`；**赋值或调用 = CS0070**，报错原文括号里写着"从声明类型中使用时除外"）+ 多播实测：**执行顺序 = 订阅顺序**、**退订顺序随意但须同一方法实例**（lambda 不存实例就退不掉）+ `NewsChannel` / `Subscriber` **观察者模式**（发布者不认识订阅者）+ **退订实验**：未退订的临时对象仍能收到通知（订阅链持有它 → GC 不回收） | [2026/09/29/Events](2026/09/29/Events/) |
 | 2026-09-28 | **委托 delegate**（Block 3 首课） | 自定义委托 `MathOp`（声明 / 方法组实例化 / 调用）+ **多播**（`+=`/`-=`，两个都执行但只拿到最后一个返回值）+ `Action` / `Func` / 谓词 + **委托当参数 = 回调**（`Aggregate`）+ **`ScoreBoard` 注入通知者**模型（与 Breakout 的 `GameManager → Action<int>` 同构）；顺带实证：`Invoke` 是编译器生成的成员、委托是名义类型不能互转、`x(args)` = `x.Invoke(args)` | [2026/09/28/Delegates](2026/09/28/Delegates/) |
 
@@ -40,4 +41,4 @@
 - [x] 09-12：🏆 **角色类多态小 demo**（CharacterBattle 成品完成，第 5 号）
 - [x] 09-13（周日）：复盘日 → **产出 Block 2 详细计划**（09-14~09-27，见 `Notes/2026/09/13.md`）
 - [x] **Block 2（09-14~09-27）**：接口/抽象类 → 09-17 **Unity 正式开始** → 泛型/Dictionary → 🏆 **2D 打砖块**（对象池回收 + Animator 动画 + UGUI 计分 + **录屏 ≤30 秒 + 3 截图存档 demos/**）—— **09-27 收官 ✓**（全勤、无顺延）
-- [ ] **Block 3（09-28~10-11）**：**委托**（09-28 ✓）→ **事件** → **Lambda** → 泛型收口 → 文件读写 / 异常 / LINQ（用在第 7 号成品「2D 平台跳跃」的**存档**上）；C# 新特性一律先在**已入库旧项目**上做纯内部重构验证
+- [ ] **Block 3（09-28~10-11）**：**委托**（09-28 ✓）→ **事件**（09-29 ✓）→ **Lambda / 闭包**（09-30 ✓）→ 泛型收口 → 文件读写 / 异常 / LINQ（用在第 7 号成品「2D 平台跳跃」的**存档**上）；C# 新特性一律先在**已入库旧项目**上做纯内部重构验证
