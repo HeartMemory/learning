@@ -1579,6 +1579,106 @@ if (brickSpawner == null || scoreManager == null)
 4. 回归**被影响的那条路径**（本次 = 漏球）：球掉下去 → 日志 `球掉进了 FailZone` → `GAME OVER` + 下滑音 + 黑幕淡入 + 按钮可点 → `RESTART` 新一局正常
 5. 确认**没顺手改坏别处**：本题的 `cols` / `rows` 仍是 **8 / 4**
 
+## 14. Platformer 立项 + 玩家移动：刚体的"权威"与两种提交方式（10-01）
+
+> 对应工程：`Projects/Unity/Platformer`（第 7 号成品 · 立项当天）
+
+### 一、立项检查单（新 Unity 项目照做一遍，全部可核）
+
+| 项 | 怎么核 | 本次实测 |
+|---|---|---|
+| 版本与旧项目一致？ | `ProjectSettings/ProjectVersion.txt` | `6000.3.23f1`，与 Breakout **一字不差** |
+| 渲染管线一致？ | `Packages/manifest.json` 搜 `render-pipelines` / `feature.2d` | 只有 `com.unity.feature.2d` 2.0.2、**无 URP** → Built-In 2D |
+| 输入处理模式？ | `ProjectSettings.asset` 的 `activeInputHandler` | `1`（New），与 Breakout 相同 → **不用改** |
+| 忽略规则生效？ | `git check-ignore -v .../Library .../UserSettings` | 命中父层 `Projects/Unity/.gitignore` 第 **20 / 24** 行 |
+| 项目级输入资产在？ | `Assets/InputSystem_Actions.inputactions` | 在（模板自带） |
+| 首次提交多少文件？ | `git status -uall` | **31 个**（Assets 6 + Packages 2 + ProjectSettings 21 + `.vsconfig`） |
+
+⭐ **`.gitignore` 不用复制**：`Projects/Unity/.gitignore` 在**父层**，而 `Library/` 这类写法匹配**任意层级** → 子项目自动继承。
+
+### 二、⭐ 核心：刚体类型决定"谁有权威"
+
+| | 挡板 `PaddleController` | 玩家 `PlayerController` |
+|---|---|---|
+| 刚体类型 | **Kinematic** | **Dynamic** |
+| 交出去的东西 | **目标位置**（`MovePosition`） | **速度**（`linearVelocity`） |
+| 位移谁算 | **自己算**（`速度 × Time.fixedDeltaTime`） | **物理引擎积分** |
+| 竖直方向 | 写死 `0f`（挡板永远水平） | **保留 `y`**（归重力管） |
+| 限位 | `Mathf.Clamp` | 不需要（地形来挡） |
+
+**判据**：`Kinematic = 位置权威` → 只能 `MovePosition` / 改 `position`；`Dynamic = 速度权威` → `linearVelocity` / `AddForce`，位置交给引擎积分。
+
+**两种错配的症状**（记症状，别记结论）：
+
+| 错配 | 症状 |
+|---|---|
+| Kinematic 设 `linearVelocity` | **完全不动**（速度被忽略） |
+| Dynamic 用 `MovePosition` | 抖动 / 穿模 / 重力失真 —— 等于**抢走物理引擎的积分**，位置与速度互相打架 |
+
+⭐ **为什么玩家代码里没有 `Time.fixedDeltaTime`**：**交位移要乘步长**（"这一步到哪里"= 距离）；**交速度不用乘**（"每秒走多快"= 速率）；乘了反而变成"每秒²"。
+
+### 三、`y` 那一半必须原样保留
+
+```csharp
+_rb.linearVelocity = new Vector2(_axis * moveSpeed, _rb.linearVelocity.y);
+```
+
+- 竖直方向**归重力管**：`linearVelocity.y` 正是重力累积出的当前下落速度；写死 `0` → 重力白算 → **角色悬空不落**
+- 10-02 的跳跃会顺着这条走下去：**跳跃 = 给 `y` 一次初速度**（`new Vector2(x, jumpSpeed)`），之后由重力负责减速与下落 —— 同样是"交速度"，不是"自己加位移"
+
+### 四、`Update` 读 / `FixedUpdate` 交（承第 3 章的"Update 写、FixedUpdate 读"）
+
+| 阶段 | 干什么 | 为什么 |
+|---|---|---|
+| `Update` | `_axis = _move.ReadValue<Vector2>().x` | 输入是"**每帧的意图**"，在帧时钟里读 |
+| `FixedUpdate` | 把 `_axis` 换算成速度提交 | 物理在**固定步长**里跑，提交必须与它同拍 |
+| `Awake` | `GetComponent` + `InputSystem.actions.FindActionMap("Player").FindAction("Move")` | 只做**一次**（每帧查找是白花的；第 3 章 `Camera.main` 同理） |
+
+### 五、组件清单（谁静态、谁被物理驱动）
+
+| 工程 | 物体 | SpriteRenderer | Collider2D | Rigidbody2D |
+|---|---|---|---|---|
+| Platformer | `Player` | ✓ | `CapsuleCollider2D` | ✓ **Dynamic** |
+| Platformer | `Ground` | ✓ | `BoxCollider2D` | ✗ **没有 = 静态** |
+| Breakout（实测计数） | 球 | ✓ | `CircleCollider2D` ×1 | ✓ Dynamic ← **全场刚体只有 2 个**（球 + 挡板） |
+| Breakout | 挡板 | ✓ | `BoxCollider2D` | ✓ Kinematic |
+| Breakout | 左右墙 / 砖块 ×32 | — / ✓ | `BoxCollider2D` | ✗ **全都没有** → 静态碰撞体最省 |
+
+- ⚠️ **2D 精灵不会自动生成碰撞体**（与 3D 的 `Create → Cube` 不同）→ 必须手动 `Add Component`；漏挂 = **直接穿过地面**
+- **Box vs Capsule**：`Box` 边缘平整但**直角**容易卡在台阶 / 瓦片接缝；`Capsule` 底顶是**圆弧**，滑过接缝更顺（Tilemap 由方格拼出、接缝多 → 玩家用 Capsule）
+
+### 六、`Rigidbody2D` 五个面值（场景 YAML 核过的实际值）
+
+| 字段 | 值 | 判据 |
+|---|---|---|
+| `m_BodyType` | `0`（Dynamic） | 要受重力、要被撞 |
+| `m_GravityScale` | `1` | 标准重力（调跳跃手感时才动它） |
+| `m_Constraints` | `4`（**Freeze Rotation Z**） | 不勾 → 一撞就翻滚 |
+| `m_CollisionDetection` | `1`（Continuous） | 防高速下落"一步跨过地面" |
+| `m_Interpolate` | `1`（Interpolate） | 物理 50Hz vs 渲染帧率浮动 → 不插值会抖（相机跟随时最明显） |
+
+**一条容易忽略的相互作用**：我们每帧**覆盖**水平速度 → `线性阻尼` 在 x 上看不出效果；但 `y` 是**原样保留**的 → **阻尼确实作用于下落**（调大就变"飘"）。
+
+### 七、⭐ 项目级 Input Actions 存在哪（今天挖出来的）
+
+```text
+InputSystem.actions
+  = 读 ProjectSettings/EditorBuildSettings.asset 的 m_configObjects 里那条
+       com.unity.input.settings.actions  →  指向 Assets/InputSystem_Actions.inputactions
+```
+
+实测（两个项目**逐行相同**）：
+
+```yaml
+m_configObjects:
+  com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 3590b91b4603b465dbb4216d601bff33, type: 3}
+```
+
+- **不需要手动导入**：新建项目时**自动写好**；它在 `ProjectSettings/` → **跟着仓库走**（换机器 / 重新 clone 也在）
+- 三条查找路径：① 选中 `.inputactions` 资产 → Inspector 直接写 "assigned / not assigned" ② `Edit → Project Settings → Input System Package → Settings`（源码路径常量 `"Project/Input System Package"` + 子节点 `Settings`，**该子节点只在"项目级 Actions 启用时"出现**）③ 设置窗口搜索框输 `project-wide`
+- ⚠️ 包源码注释警告：**删掉 `Library/` 后**，包"取不到已挂的项目级资产"（该查找依赖资产导入回调）→ 那时**别急着重拖**，先重开项目 / 等资产重新导入
+- 最终判据永远是**运行时探针**（`Debug.Log(InputSystem.actions)`），不是面板长相
+
 ## 📎 环境与工具备忘（Unity 部分）
 
 - **⚠️ 四层"保存"（09-22 起血泪，09-26 补齐第四层）**：① **脚本** → VS2022/CodeBuddy 里 `Ctrl+S`（`Assets/**/*.cs`）② **场景** → 场景窗口 `Ctrl+S`（`Assets/Scenes/*.unity`，**顺带记住：检查器里改的 `[SerializeField]` 值也存在这里**）③ **项目设置** → **文件 → 保存项目**（⚠️ **无快捷键，最容易漏**；存 `ProjectSettings/*.asset`：标签和层 / 输入管理器 / 物理设置 / **`organizationId`**…）④ **🆕 资产层** → `.anim` / `.controller` / Prefab / ScriptableObject **也不是自动写盘的**（同样靠"文件 → 保存"）。**只"内存里改了"不算数**：不落盘 → 关掉 Unity 就丢、`git status` 看不见、别人 clone 也没有
