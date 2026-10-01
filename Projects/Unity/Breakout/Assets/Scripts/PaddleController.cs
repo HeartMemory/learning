@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PaddleController : MonoBehaviour
 {
+    [SerializeField] private HoldButton leftButton;
+    [SerializeField] private HoldButton rightButton;
     [SerializeField] private float speed = 8f;   // 每秒移动多少单位
     private Rigidbody2D _rb;
     private float _axis;                         // Update 写、FixedUpdate 读
@@ -24,7 +26,10 @@ public class PaddleController : MonoBehaviour
     {
         // 项目级输入资产（Player 地图 / Move 动作）：每帧"拉"一次当前值
         // Move 是 Vector2（x 左右、y 上下），挡板只需 x
-        _axis = _move.ReadValue<Vector2>().x;
+        float axis = _move.ReadValue<Vector2>().x;
+        if (leftButton != null && leftButton.IsHeld) axis -= 1f;     // ★ 按钮 = 第二个输入源
+        if (rightButton != null && rightButton.IsHeld) axis += 1f;
+        _axis = Mathf.Clamp(axis, -1f, 1f);
     }
 
     void FixedUpdate()
