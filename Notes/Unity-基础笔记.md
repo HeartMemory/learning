@@ -1679,6 +1679,80 @@ m_configObjects:
 - ⚠️ 包源码注释警告：**删掉 `Library/` 后**，包"取不到已挂的项目级资产"（该查找依赖资产导入回调）→ 那时**别急着重拖**，先重开项目 / 等资产重新导入
 - 最终判据永远是**运行时探针**（`Debug.Log(InputSystem.actions)`），不是面板长相
 
+## 15. 多输入源汇合 + UI"按住"按钮（10-01 · Breakout 追加）
+
+> 需求：给 Breakout 加"屏幕左 / 右按钮"，**按住持续移动**；且**不能破坏**原有的键盘 / 摇杆输入。
+
+### 一、⭐ 核心判据：输入源可以有多个，但"轴值"只能有一个汇合点
+
+```csharp
+// PaddleController.Update
+float axis = _move.ReadValue<Vector2>().x;                     // 输入源①：键位 / 摇杆
+if (leftButton  != null && leftButton.IsHeld)  axis -= 1f;      // 输入源②：屏幕左按钮
+if (rightButton != null && rightButton.IsHeld) axis += 1f;      // 输入源③：屏幕右按钮
+_axis = Mathf.Clamp(axis, -1f, 1f);                             // ⭐ 唯一的汇合点
+```
+
+- **`FixedUpdate` 一行都没改**（它只认 `_axis`）→ 这就是判据的**现场证据**：**汇合点的作用，是让下游"对输入源的数量一无所知"**
+- 左右同时按 → `-1 + 1 = 0` → 挡板不动（`Clamp` 天然处理，不需要写特判）
+- ❌ 反例（别这么做）：按钮脚本里直接 `rb.MovePosition(...)` 或直接改位置 → 与轴输入**互相覆盖**（谁后写谁赢），且绕过单向数据流
+
+### 二、"按住"必须用**两个时点**，`OnClick` 做不到
+
+| 通路 | 触发时机 | 能表达"按住"吗 |
+|---|---|---|
+| `Button.OnClick`（`UnityEvent`，检查器里拖方法） | 按下**且**抬起都在同一对象时，**触发一次** | ❌ 不能 |
+| `IPointerDownHandler` / `IPointerUpHandler`（**接口**） | 按下时一次、抬起时一次 | ✅ `Down` 置真、`Up` 置假 → 中间**持续为真** |
+
+### 三、⭐ 框架是**按接口**来找你的（不是按方法名）
+
+```csharp
+public class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+{
+    [SerializeField] private float value = -1f;      // 左按钮 -1，右按钮 +1
+    public bool IsHeld { get; private set; }
+
+    public void OnPointerDown(PointerEventData e) => IsHeld = true;
+    public void OnPointerUp(PointerEventData e)   => IsHeld = false;
+}
+```
+
+- 接口源码（UGUI 包 `Runtime/UGUI/EventSystem/EventInterfaces.cs`）只承诺一件事：
+  ```csharp
+  public interface IPointerDownHandler : IEventSystemHandler { void OnPointerDown(PointerEventData eventData); }
+  ```
+- 流程：指针按下 → `EventSystem` 从屏幕坐标发**射线** → 命中的 UI 元素上**找实现了该接口的组件** → 调它的方法
+- ⚠️ **方法名不能改、签名必须一致**（形参名随便，类型不行）→ "写了方法却永远不被调用"，九成是**没实现对应接口**
+- `IEventSystemHandler` 是个**空接口**，只当"我是 EventSystem 家族成员"的**标记**
+
+**同一个形状你已经见过好几次**：Unity 的回调 = **"事件名 + 一个数据包参数"**
+
+| 回调 | 数据包 | 里面装什么 |
+|---|---|---|
+| `OnCollisionEnter2D(Collision2D collision)` | `collision` | 碰撞点 / 法线 / 相对速度（09-22 用过 `GetContact(0).point`） |
+| `OnTriggerEnter2D(Collider2D other)` | `other` | 撞进来的那个碰撞体 |
+| `OnPointerDown(PointerEventData e)` | `e` | `pointerId` / `position` / `delta` / `button` / `clickCount` … |
+| `Action<int> OnScoreChanged` | 那个 `int` | 只有一个**值**（不是对象） |
+
+### 四、两套"谁来找你"的对照（控制反转的两个版本）
+
+| 谁调用你 | 靠什么约定找到你 | 拼错 / 写漏的后果 |
+|---|---|---|
+| Unity 生命周期（`Awake` / `Update` / `OnDestroy`） | **方法名** | **静默失效**（不报错、不执行 → 所以一律用 IDE 补全） |
+| EventSystem 事件（`OnPointerDown` 等） | **接口** | **编译报错**（`CS0535` 未实现接口成员 → 编译器替你兜住） |
+
+### 五、三个配套条件（缺任何一个 → "按了没反应，也不报错"）
+
+1. `using UnityEngine.EventSystems;`（漏了 = `CS0246`，找不到 `IPointerDownHandler` / `PointerEventData`）
+2. 组件挂在**能被射线命中**的东西上：Canvas 上有 `GraphicRaycaster`，且该图形的 `Raycast Target` = ✅
+3. 场景里有 **`EventSystem`**（Breakout 一直都有 —— 证据：`RESTART` 按钮能点）
+
+### 六、面值的默认值也是判据
+
+`[SerializeField] private float value = 0f;` —— 实际值靠检查器填（左 `-1` / 右 `+1`）。
+⚠️ 但**默认值 `0f` 有隐患**：将来新建按钮忘记填 → `axis += 0` → **"按了没反应、也不报错"**（最难查的那类）。
+⭐ 判据：**面值默认值要么是有意义的值，要么明确留 0 当"必须填"的信号**（并写进注释）。
+
 ## 📎 环境与工具备忘（Unity 部分）
 
 - **⚠️ 四层"保存"（09-22 起血泪，09-26 补齐第四层）**：① **脚本** → VS2022/CodeBuddy 里 `Ctrl+S`（`Assets/**/*.cs`）② **场景** → 场景窗口 `Ctrl+S`（`Assets/Scenes/*.unity`，**顺带记住：检查器里改的 `[SerializeField]` 值也存在这里**）③ **项目设置** → **文件 → 保存项目**（⚠️ **无快捷键，最容易漏**；存 `ProjectSettings/*.asset`：标签和层 / 输入管理器 / 物理设置 / **`organizationId`**…）④ **🆕 资产层** → `.anim` / `.controller` / Prefab / ScriptableObject **也不是自动写盘的**（同样靠"文件 → 保存"）。**只"内存里改了"不算数**：不落盘 → 关掉 Unity 就丢、`git status` 看不见、别人 clone 也没有
@@ -1742,3 +1816,4 @@ m_configObjects:
 - [ ] **音效变体铺开 + 音效池（09-25 记）**：现在只有撞砖做了 3 个音高变体 → 挡板/结算也做；再体会"同时发声上限"与"多个 `AudioSource` 轮询（voice pool）"
 - [ ] **音量统一管理（09-25 记）**：三处各自 `Volume = 1` → 引入 **`AudioMixer`** 做 `BGM` / `SFX` 分组与总音量（设置界面要用）
 - [ ] **`.anim` / `.controller` 的 git 自查（09-25 记）**：今天新增了 `Assets/Animation/` 目录 → 提交时用**目录级** `git add`，确认 `.anim` / `.controller` 的 `.meta` 一起进（09-22 那条纪律，换了资产类型照样适用）
+- [ ] ⚠️ **Breakout 素材待更新（10-01 记）**：画面新增**触屏左右按钮**（`LeftButton` / `RightButton`，见本册第 15 章）→ **09-26 的录屏与 3 张截图已与工程不一致** → 待重录 **≤30 秒**录屏 + 3 张**带按钮**的截图（命名口径：`demos/breakout-demo.mp4` + `breakout-NN-<描述>.png`）
