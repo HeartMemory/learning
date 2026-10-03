@@ -100,18 +100,16 @@ public class PlayerController : MonoBehaviour
         //    ⭐ 通用判据：传感器有"跟不上状态变化"的那一瞬间，用它判状态时必须把这一瞬排除
         if (isGrounded && y <= 0f) _jumpsLeft = maxJumps;
 
-        // ④ 一次决策，把 y 的三个去处合成一个：
+        // ④ 一次决策：y 只有两个去处
         //    · 起跳：y = jumpSpeed（【覆盖】不是累加 —— 覆盖才能让高度只由 jumpSpeed 决定）
-        //    · 落地：y < 0 时才归零（站住时求解器会残留一点负值；归零后起跳高度确定）
         //    · 其余：原样保留（y 归重力管，承 09-21"Kinematic 交位置 / Dynamic 交速度"）
+        //    ⭐ 落地归零那一步【已删除】：它想保证的"起跳高度确定"，其实由【覆盖式赋值】已经满足；
+        //       而它的副作用是"探针一提早喊接地就把下落停住" → 角色悬在半空（缝隙）。
+        //       现在落地位置交给【物理求解器】（碰撞体接触面）决定 → 精确贴地。
         if (_jumpRequested && _jumpsLeft > 0)
         {
             y = jumpSpeed;
             _jumpsLeft--;
-        }
-        else if (isGrounded && y < 0f)
-        {
-            y = 0f;
         }
 
         // ⑤ 消费掉意图：放在 if【外面】
