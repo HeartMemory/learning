@@ -40,14 +40,26 @@ static string Show(TreeNode? root)
 static void Check(string title, int?[] input, int expected)
 {
     TreeNode? root = Build(input);
-    int actual = new Solution().MaxDepth(root);
-    bool ok = actual == expected;
+    int a = new Solution().MaxDepth(root);        // 递归（后序 · 返回型）
+    int b = new Solution().MaxDepth1(root);       // 层序 BFS（10-02 写的；10-04 起正式纳入判题）
 
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}");
-    if (!ok)
+    // 10-04 加：显式栈模拟调用栈版（必须按后序：孩子先出结果、父最后合并）
+    int c = 0;
+    string stackTag = "⬜未实现";
+    try
+    {
+        c = new Solution().MaxDepthByStack(root);
+        stackTag = c == expected ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
+    bool ok = a == expected && b == expected;
+    string bfsTag = b == expected ? "✅" : "❌";
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔BFS：{bfsTag}｜显式栈：{stackTag}〕");
+    if (!ok || stackTag == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
-        Console.WriteLine($"     期望深度：{expected}   实际：{actual}");
+        Console.WriteLine($"     期望：{expected}   递归：{a}   BFS：{b}   显式栈：{(stackTag == "⬜未实现" ? "—" : c.ToString())}");
     }
 }
 
@@ -175,5 +187,56 @@ public class Solution {
     {
         if(root == null) return 0;
         return Math.Max(MaxDepth(root.left), MaxDepth(root.right)) + 1;
+    }
+
+    // ═══════ 10-04（复盘日）· 盲写靶子：显式栈模拟调用栈版 ═══════
+    // TODO: 不用递归、也不用 BFS 队列，用【显式栈】自己模拟"系统帮我保存调用现场"。
+    //
+    //   ⚠️ 先分清：本题已经有**两个"非递归"**的东西了，别混为一谈 ——
+    //      · `MaxDepth1` 是 **BFS 队列**：它换的是**推进机制**（一层层推进），
+    //        深度 = 层数。它**没有**模拟调用栈。
+    //      · 今天要写的这版，才是"把**递归的调用栈**搬到台面上"：必须按**后序**走
+    //        （孩子先出结果、父最后合并）—— 这正是 145 路线 A 的模板能直接套用的地方。
+    //
+    //   ── 三个卡点（都是"递归里默认有、显式栈里必须自己造"的东西）：
+    //     ① 递归里"孩子的答案"走**返回值**；可栈里只有节点，**没有返回值这个概念** ——
+    //        那每个节点算出来的深度该存在**哪里**？（提示方向：`Dictionary<TreeNode,int>`，
+    //        或者干脆让栈里装"节点 + 它的深度"这样的组合。选一条，说清理由）
+    //     ② 递归里"孩子算完了，回到我这里"是**自动**发生的；栈里怎么知道"可以合并了"？
+    //        （这就是 145 路线 A 那个"标记"要解决的问题）
+    //     ③ 空树 / 单节点还接得住吗？（对照递归版终止条件那一行）
+    //
+    //   ── 自查探针：满树三层应得 3 ｜ 空树应得 0 ｜ 全左斜链 `[1,2,null,3,null,4]` 应得 **4**
+    //      （斜链专抓"深度只算了一半"或"忘了取 max"）。
+    //
+    //   ── 复杂度（写完自己算）：每个节点进出栈若干次 → 时间 O(? )；额外空间 O(n)。
+    //      ⚠️ 自己回答：**它比递归版省空间吗？** —— 答案会让"显式栈一定更省"这个直觉破产。
+    public int MaxDepthByStack(TreeNode? root)
+    {
+        if(root == null) return 0;
+        Stack<(TreeNode node, int stage)> tree = new Stack<(TreeNode node, int stage)>();
+        Dictionary<TreeNode, int> depth = new Dictionary<TreeNode, int>();
+        tree.Push((root, 0));
+        while(tree.Count > 0)
+        {
+            (TreeNode cur, int times) = tree.Pop();
+            if(times == 0)
+            {
+                tree.Push((cur, 1));
+                if(cur.left != null) tree.Push((cur.left, 0)); 
+            }else if(times == 1)
+            {
+                tree.Push((cur, 2));
+                if(cur.right != null) tree.Push((cur.right, 0));
+            }else if(times == 2)
+            {
+                int leftDepth = 0, rightDepth = 0;
+                TreeNode? l = cur.left, r = cur.right;
+                if (l != null) leftDepth = depth[l];
+                if (r != null) rightDepth = depth[r];
+                depth[cur] = Math.Max(leftDepth, rightDepth) + 1;
+            }
+        }
+        return depth[root];
     }
 }

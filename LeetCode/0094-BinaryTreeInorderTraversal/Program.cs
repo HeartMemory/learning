@@ -40,16 +40,28 @@ static string Show(TreeNode? root)
 static void Check(string title, int?[] input, int[] expected)
 {
     TreeNode? root = Build(input);
-    IList<int> actual = new Solution().InorderTraversal(root);
-    List<int> a = new List<int>(actual);
     List<int> e = new List<int>(expected);
+
+    List<int> a = new List<int>(new Solution().InorderTraversal(root));   // 递归版（09-29）
+
+    // 10-04 加：显式栈迭代版 —— 跑同一套用例，两边都得绿（两版互证）
+    List<int> b = new List<int>();
+    string iterTag = "⬜未实现";
+    try
+    {
+        b = new List<int>(new Solution().InorderTraversalIterative(root));
+        iterTag = b.SequenceEqual(e) ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
     bool ok = a.SequenceEqual(e);
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}");
-    if (!ok)
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔迭代版：{iterTag}〕");
+    if (!ok || iterTag == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
-        Console.WriteLine($"     期望：[{string.Join(", ", e)}]");
-        Console.WriteLine($"     实际：[{string.Join(", ", a)}]");
+        Console.WriteLine($"     期望：  [{string.Join(", ", e)}]");
+        if (!ok) Console.WriteLine($"     递归版：[{string.Join(", ", a)}]");
+        if (iterTag == "❌") Console.WriteLine($"     迭代版：[{string.Join(", ", b)}]");
     }
 }
 
@@ -135,5 +147,44 @@ public class Solution {
         Walk(node.left, result);
         result.Add(node.val);
         Walk(node.right, result);
+    }
+
+    // ═══════ 10-04（复盘日）· 盲写靶子：显式栈迭代版（三题里最难的那个）═══════
+    // TODO: 用【显式栈】做中序。口诀已经在上面 100-101 行给过：
+    //       "能往左就往左，不能往左就吐一个，再往右。"
+    //       —— 今天的活儿是**把口诀翻译成代码**，不是重新想算法。
+    //
+    //   ── 为什么它比前序难（想清楚这句，循环写法就出来了）：
+    //      前序是"压进去就能访问"；中序**不能**——因为最左边的节点还没压到栈里，
+    //      你就不知道它存在。⇒ 所以 ① 压栈时**不装结果**，② 要先"一路向左压到底"。
+    //
+    //   ── 循环骨架的三段（分别对应口诀的三小句，自己填条件）：
+    //      ① 内层 while：还能往左 → 压栈 + 继续左（压的是什么？装不装结果？）
+    //      ② 压不动了 → 栈顶弹出来，这时候**装结果**（为什么此刻装是对的？）
+    //      ③ 转向弹出节点的**右**子树（右子树里的最左节点，下一轮内层 while 会处理）
+    //      ④ 外层循环什么时候停？（提示：`cur == null` 且 `栈空` —— 两个条件缺一不可，为什么？）
+    //
+    //   ── 纸笔自查：满树 `[1,2,3,4,5,6,7]` 期望 `4,2,5,1,6,3,7`；
+    //      另一条专用探针：**全左斜链 `[1,2,null,3,null,4]` 期望 `4,3,2,1`**（倒序）——
+    //      这条链专门检验"一路向左压到底"有没有写对（写成前序那种写法，这组必红）。
+    //
+    //   ── 复杂度：入栈/出栈各一次 → O(n)；栈最大容量 = 树高 h（斜链 h = n）。
+    public IList<int> InorderTraversalIterative(TreeNode? root) {
+        List<int> ints = new List<int>();
+        if(root == null) return ints;
+        Stack<TreeNode> tree = new Stack<TreeNode>();
+        TreeNode cur = root;
+        while(cur != null || tree.Count > 0)
+        {
+            while(cur != null)
+            {
+                tree.Push(cur);
+                cur = cur.left;
+            }
+            cur = tree.Pop();
+            ints.Add(cur.val);
+            cur = cur.right;
+        }
+        return ints;
     }
 }

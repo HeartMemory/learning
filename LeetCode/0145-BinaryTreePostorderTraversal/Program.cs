@@ -38,16 +38,38 @@ static string Show(TreeNode? root)
 static void Check(string title, int?[] input, int[] expected)
 {
     TreeNode? root = Build(input);
-    IList<int> actual = new Solution().PostorderTraversal(root);
-    List<int> a = new List<int>(actual);
     List<int> e = new List<int>(expected);
+
+    List<int> a = new List<int>(new Solution().PostorderTraversal(root));   // 递归版（09-30）
+
+    // 10-04 加：两条迭代路线各跑一遍，和递归版**三版互证**
+    List<int> b = new List<int>();
+    string tagB = "⬜未实现";
+    try
+    {
+        b = new List<int>(new Solution().PostorderTraversalIterativeB(root));
+        tagB = b.SequenceEqual(e) ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
+    List<int> c = new List<int>();
+    string tagA = "⬜未实现";
+    try
+    {
+        c = new List<int>(new Solution().PostorderTraversalIterativeA(root));
+        tagA = c.SequenceEqual(e) ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
     bool ok = a.SequenceEqual(e);
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}");
-    if (!ok)
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔路线B 逆序：{tagB}｜路线A 标记：{tagA}〕");
+    if (!ok || tagB == "❌" || tagA == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
-        Console.WriteLine($"     期望：[{string.Join(", ", e)}]");
-        Console.WriteLine($"     实际：[{string.Join(", ", a)}]");
+        Console.WriteLine($"     期望：  [{string.Join(", ", e)}]");
+        if (!ok) Console.WriteLine($"     递归版：[{string.Join(", ", a)}]");
+        if (tagB == "❌") Console.WriteLine($"     路线B ：[{string.Join(", ", b)}]");
+        if (tagA == "❌") Console.WriteLine($"     路线A ：[{string.Join(", ", c)}]");
     }
 }
 
@@ -133,5 +155,78 @@ public class Solution {
         Walk(node.left, result);
         Walk(node.right, result);
         result.Add(node.val);
+    }
+
+    // ═══════ 10-04（复盘日）· 盲写靶子①：路线 B —— "偷懒版"（先写这个）═══════
+    // TODO: 用【前序的迭代写法】改两个地方 + 一次反转，就得到后序。
+    //
+    //   ── 推理链（自己想通，别背）：
+    //      前序 = 根 → 左 → 右 ； 后序 = 左 → 右 → 根。
+    //      问自己两个问题：
+    //       ① 把前序里"先左后右"的压栈顺序**对调**，得到的是哪种顺序？（写在纸上：根 ? ?）
+    //       ② 把 ① 的结果**整体倒过来**，又是哪种顺序？
+    //      ⇒ 所以：抄 144 的循环，改**压栈顺序**，最后 `result.Reverse()`。
+    //
+    //   ── 一个必须答的细节：**反转应该在哪一步做**——循环里每轮反一次，还是循环外一次？
+    //      （从复杂度上论证，不要凭感觉）
+    //
+    //   ── 纸笔自查：满树 `[1,2,3,4,5,6,7]` 期望 `4,5,2,6,7,3,1`。
+    public IList<int> PostorderTraversalIterativeB(TreeNode? root) {
+        Stack<int> ints = new Stack<int>();
+        List<int> result = new List<int>();
+        if(root == null) return result;
+        Stack<TreeNode> tree = new Stack<TreeNode>();
+        tree.Push(root);
+        while(tree.Count > 0)
+        {
+            TreeNode cur = tree.Pop();
+            ints.Push(cur.val);
+            if(cur.left != null) tree.Push(cur.left);
+            if(cur.right != null) tree.Push(cur.right);
+        }
+        while(ints.Count > 0)
+        {
+            result.Add(ints.Pop());
+        }
+        return result;
+    }
+
+    // ═══════ 10-04（复盘日）· 盲写靶子②：路线 A —— "老实版"（压栈带标记）═══════
+    // TODO: 真正模拟系统调用栈：**回退时判断"我是从左子树上来的，还是从右子树上来的"**。
+    //
+    //   ── 核心难点：栈里只有"节点"，可"我回来了"这件事怎么表达？
+    //       ⇒ 提示方向：让栈里装的**不只是一个节点**（可以是"节点 + 一个状态"），
+    //         或者**再借一个容器**记住"谁已经访问过了"。两条路都行，选一条写。
+    //
+    //   ── 三个必须答的点（写在注释里，别只在脑子里过）：
+    //     ① 第一次来到某个节点 vs **第三次**回到它（左回来了 / 右回来了），
+    //        这两种"回来"分别该做什么？（第三次才是"装自己"的时刻 —— 为什么?）
+    //     ② 空节点还要不要压栈？（对照 144：那里的判空在哪）
+    //     ③ 循环结束时栈里还剩什么？
+    //
+    //   ── 写完和路线 B 对照：两条路线谁更短？谁更接近"系统真正做的事"？
+    //      面试里被追问"不用反转怎么写"，答的就是路线 A。
+    public IList<int> PostorderTraversalIterativeA(TreeNode? root) {
+        List<int> ints = new List<int>();
+        if(root == null) return ints;
+        Stack<(TreeNode node, int stage)> tree = new Stack<(TreeNode node, int stage)>();
+        tree.Push((root, 0));
+        while(tree.Count > 0)
+        {
+            (TreeNode cur, int times) = tree.Pop();
+            if(times == 0)
+            {
+                tree.Push((cur, 1));
+                if(cur.left != null) tree.Push((cur.left, 0)); 
+            }else if(times == 1)
+            {
+                tree.Push((cur, 2));
+                if(cur.right != null) tree.Push((cur.right, 0));
+            }else if(times == 2)
+            {
+                ints.Add(cur.val);
+            }
+        }
+        return ints;
     }
 }

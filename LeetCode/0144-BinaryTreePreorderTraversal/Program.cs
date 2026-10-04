@@ -48,16 +48,28 @@ static string Show(TreeNode? root)
 static void Check(string title, int?[] input, int[] expected)
 {
     TreeNode? root = Build(input);
-    IList<int> actual = new Solution().PreorderTraversal(root);
-    List<int> a = new List<int>(actual);
     List<int> e = new List<int>(expected);
+
+    List<int> a = new List<int>(new Solution().PreorderTraversal(root));   // 递归版（09-28）
+
+    // 10-04 加：显式栈迭代版 —— 跑同一套用例，两边都得绿（两版互证）
+    List<int> b = new List<int>();
+    string iterTag = "⬜未实现";
+    try
+    {
+        b = new List<int>(new Solution().PreorderTraversalIterative(root));
+        iterTag = b.SequenceEqual(e) ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
     bool ok = a.SequenceEqual(e);
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}");
-    if (!ok)
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔迭代版：{iterTag}〕");
+    if (!ok || iterTag == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
-        Console.WriteLine($"     期望：[{string.Join(", ", e)}]");
-        Console.WriteLine($"     实际：[{string.Join(", ", a)}]");
+        Console.WriteLine($"     期望：  [{string.Join(", ", e)}]");
+        if (!ok) Console.WriteLine($"     递归版：[{string.Join(", ", a)}]");
+        if (iterTag == "❌") Console.WriteLine($"     迭代版：[{string.Join(", ", b)}]");
     }
 }
 
@@ -140,4 +152,37 @@ public class Solution {
         Walk(node.right, result);
     }
 
+    // ═══════ 10-04（复盘日）· 盲写靶子：显式栈迭代版 ═══════
+    // TODO: 不递归，用【显式栈】模拟"系统在背后替我做的事"。
+    //
+    //   ⚠️ 落笔前先用一句话回答（README 清单点名的那句）：
+    //       **左右孩子，谁先压栈？为什么？**（栈是后进先出，而前序要**先**访问左）
+    //      —— 答不出来就先别写代码，把这一句想明白，代码只剩 5 行。
+    //
+    //   ── 三个想清楚再写的点：
+    //     ① "出栈顺序"就等于"访问顺序"吗？若等于，节点该在**压栈时**还是**出栈时**装进 result？
+    //     ② 栈里能装 null 吗？不能 → 压之前得先做什么？（对照：递归版的终止条件写在哪一行）
+    //     ③ 空树那组用例（期望空列表）—— 你现在的写法还接得住吗？
+    //
+    //   ── 纸笔自查（别在脑子里空转）：满树 `[1,2,3,4,5,6,7]` 期望 `1,2,4,5,3,6,7`。
+    //      手动画栈的进出（每步记下栈里剩谁、吐出谁），对不上就回去改。
+    //
+    //   ── 复杂度（写完自己算）：每个节点入栈一次 + 出栈一次 → 时间 O(n)；栈最大容量 = 树高 h。
+    //
+    //   ── AC 之后回来看这句：递归把"栈"藏在**系统的调用栈**里；这里是把**同一个东西**
+    //      搬到台面上自己管 —— 今天计基整理 30min 讲的就是它（见当日复盘）。
+    public IList<int> PreorderTraversalIterative(TreeNode? root) {
+        List<int> ints = new List<int>();
+        if(root == null) return ints;
+        Stack<TreeNode> tree = new Stack<TreeNode>();
+        tree.Push(root);
+        while(tree.Count > 0)
+        {
+            TreeNode cur = tree.Pop();
+            ints.Add(cur.val);
+            if(cur.right != null) tree.Push(cur.right);
+            if(cur.left != null) tree.Push(cur.left);
+        }
+        return ints;
+    }
 }
