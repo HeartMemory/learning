@@ -14,7 +14,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 6f;      // 面值放检查器可调（09-18 学过的理由）
 
     [Header("跳跃手感")]
-    [SerializeField] private float jumpSpeed = 7f;      // h = v²/(2g) ≈ 2.5（屏幕顶只到 +5）
+    [SerializeField] private float jumpSpeed = 7f;      // h = v²/(2g) ≈ 2.5
                                                         // ⭐ 高度对 v 是【平方】关系：想跳高一倍，v 要 ×1.414
     [SerializeField] private int maxJumps = 2;          // 1 = 普通跳；2 = 二段跳
     [SerializeField] private float checkRadius = 0.15f; // 探针半径：调大更"黏"，但"离地后仍判接地"的窗口也变长
@@ -22,6 +22,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private LayerMask groundLayer;     // ⚠️ 只勾 Ground，不能勾 Player
 
     private Rigidbody2D _rb;
+    private Collider2D _col;                                            // 🆕 真接触判定用它
+    private readonly ContactPoint2D[] _contacts = new ContactPoint2D[8]; // 🆕 复用缓冲，别每物理步 new
     private InputAction _move;   // 查表一次就缓存（与 Camera.main 同理，别每帧查）
     private InputAction _jump;
 
@@ -30,9 +32,12 @@ public class PlayerController : MonoBehaviour
     private int _jumpsLeft;         // 可消耗资源：起跳次数余额，落地回满
     private bool _jumpRequested;    // 边沿语义：这一帧【刚按下】
 
+
+
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _col = GetComponent<Collider2D>();
 
         // ⭐ 校验必须放在使用之前（"日志放在会抛异常的行之后 = 等于没放"，09-24 的教训）
         Debug.Log($"项目级 Actions 已接上？ → {InputSystem.actions}", this);   // 接线验证完可删
@@ -48,6 +53,11 @@ public class PlayerController : MonoBehaviour
         //   ⭐ "收集全部问题再停" 而不是 "报第一个就 return"：前者修一轮，后者修三轮
         bool wiringOk = true;
 
+        if (_col == null)
+        {
+            Debug.LogError("Collider2D 没找到：真接触判定需要玩家自己的碰撞体", this);
+            wiringOk = false;
+        }
         if (groundCheck == null)
         {
             Debug.LogError("groundCheck 槽位是空的：没把 Player/GroundCheck 拖进来", this);
@@ -85,11 +95,12 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // ① 接地判定：脚点探针，现问现答
-        //    · 圆心取 .position（世界坐标）——查询在世界空间做；检查器「位置」显示的是本地坐标
-        //    · 掩码只放行 Ground 层 → 天然排除玩家自己（那个圆会压到自己身上）
-        //    · 返回 Collider2D 或 null → "有没有拿到东西"就是"接不接地"（用 != null，别用 is not null）
-        bool isGrounded = Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer) != null;
+        // ① 接地判定（10-04 改）：从「脚点探针」换成「真接触 + 接触面朝上」
+        //    · 为什么换：探针只覆盖脚底中间 30% → 站在平台边缘时"人站着、探针却说没地"
+        //      → 回满门被关掉 → 次数永远是 0（实测日志：_jumpsLeft = 0, isGrounded = False）
+        //    · 为什么必须看【法线】：贴墙也是接触！只看"有没有接触"会让空中贴墙白送跳次
+        //    · 必须在 FixedUpdate 里读：接触每个物理步更新（放 Update 里读到的是滞后值）
+        bool isGrounded = IsStandingOnGround();
 
         // ② y 先取出来：下面三处决策都靠它判断
         float y = _rb.linearVelocity.y;
@@ -121,6 +132,21 @@ public class PlayerController : MonoBehaviour
         //    判据：一个物理步只能提交一次 —— 分两次赋值，后写的会覆盖先写的
         _rb.linearVelocity = new Vector2(_axis * moveSpeed, y);
     }
+    // ⭐ 真接触判定：物理上真的"踩在"某个面上
+    //    · normal 的方向约定：从【对方表面】指向【我】 → 站在地面上时 ≈ (0, 1)
+    //    · 阈值 0.7 ≈ 45° 以上才算"脚下"（台阶 / 斜面的宽容度，实测再调 —— 承 10-03 的台阶经验）
+    //    · 复用 _contacts 缓冲：这个方法每物理步都会调，别在里面 new（09-25 的 GC 教训）
+    //    · GetContacts 只返回【真实物理接触】→ 触发器、以及层矩阵没放行的对，天然不会出现
+    private bool IsStandingOnGround()
+    {
+        int count = _col.GetContacts(_contacts);
+        for (int i = 0; i < count; i++)
+        {
+            if (_contacts[i].normal.y > 0.7f) return true;
+        }
+        return false;
+    }
+
 
     // ══════════════════════════════════════════════════════════════
     //  探针可视化：选中 Player 时，在场景视图里画出那个"接地的圆"
