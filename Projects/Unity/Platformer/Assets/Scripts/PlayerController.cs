@@ -21,11 +21,16 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform groundCheck;     // 拖 Player/GroundCheck 进来
     [SerializeField] private LayerMask groundLayer;     // ⚠️ 只勾 Ground，不能勾 Player
 
+    [Header("视觉")]
+    [SerializeField] private Transform visual;   // 拖 Player/Visual（只装视觉的子物体）
+
     private Rigidbody2D _rb;
     private Collider2D _col;                                            // 🆕 真接触判定用它
     private readonly ContactPoint2D[] _contacts = new ContactPoint2D[8]; // 🆕 复用缓冲，别每物理步 new
     private InputAction _move;   // 查表一次就缓存（与 Camera.main 同理，别每帧查）
     private InputAction _jump;
+    private int _facing = 1;                 // 当前朝向：1 = 朝右，-1 = 朝左
+
 
     // ── 两个"跨时钟的桥"：Update 写、FixedUpdate 读 ──
     private float _axis;            // 电平语义：你【正推着】多少
@@ -53,6 +58,11 @@ public class PlayerController : MonoBehaviour
         //   ⭐ "收集全部问题再停" 而不是 "报第一个就 return"：前者修一轮，后者修三轮
         bool wiringOk = true;
 
+        if (visual == null)
+        {
+            Debug.LogError("visual 槽位是空的：转身要翻的是【视觉子树】，不是物理根", this);
+            wiringOk = false;
+        }
         if (_col == null)
         {
             Debug.LogError("Collider2D 没找到：真接触判定需要玩家自己的碰撞体", this);
@@ -91,6 +101,13 @@ public class PlayerController : MonoBehaviour
         // ⭐ 为什么要转成 _jumpRequested：这是"帧级事件"跨进物理步的唯一桥梁 ——
         //    直接在 FixedUpdate 里读它，一个渲染帧的 0~N 个物理步会【漏读或重读】
         if (_jump.WasPressedThisFrame()) _jumpRequested = true;
+
+        // 转身：⭐ 只翻【视觉子树】—— 翻物理根会把 GroundCheck 一起镜像 → 探针跑到身后
+        //   阈值 0.01 而不是 != 0：按键/摇杆的微小抖动不该触发转身
+        if (_axis > 0.01f) _facing = 1;
+        else if (_axis < -0.01f) _facing = -1;
+        ApplyFacing();
+
     }
 
     void FixedUpdate()
@@ -147,6 +164,16 @@ public class PlayerController : MonoBehaviour
         return false;
     }
 
+    // 转身：只改视觉子树 x 的【符号】，幅值保持不变
+    //   脏检查：没变就不写（与 ScoreManager 同族 —— 别每帧无脑写渲染/变换属性）
+    private void ApplyFacing()
+    {
+        Vector3 s = visual.localScale;
+        float want = Mathf.Abs(s.x) * _facing;
+        if (Mathf.Approximately(s.x, want)) return;
+        s.x = want;
+        visual.localScale = s;
+    }
 
     // ══════════════════════════════════════════════════════════════
     //  探针可视化：选中 Player 时，在场景视图里画出那个"接地的圆"

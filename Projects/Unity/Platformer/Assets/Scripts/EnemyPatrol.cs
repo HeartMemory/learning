@@ -25,6 +25,9 @@ public class EnemyPatrol : MonoBehaviour
     [Header("前方障碍（撞墙预感）")]
     [SerializeField] private float wallCheckDistance = 0.55f;   // 碰撞体半宽 0.4 + 余量 0.15
 
+    [Header("视觉")]
+    [SerializeField] private Transform visual;
+
     private Rigidbody2D _rb;
     private Vector3 _edgeCheckHome;    // 探针"朝右"时的本地位（x = 0.625）—— 转身只翻 x 符号
     private int _dir = 1;              // ⭐ 给初值：编辑模式下 Awake 不跑，射线的 Gizmos 才画得出来
@@ -38,6 +41,11 @@ public class EnemyPatrol : MonoBehaviour
         // TODO 接线自检（照 PlayerController 的风格：收集全部问题 → enabled = false）
         bool wiringOk = true;
 
+        if (visual == null)
+        {
+            Debug.LogError("visual 槽位是空的：转身要翻的是【视觉子树】，不是物理根", this);
+            wiringOk = false;
+        }
         if (_rb == null)
         {
             Debug.LogError("Rigidbody2D 没找到：巡逻需要刚体交速度", this);
@@ -81,6 +89,7 @@ public class EnemyPatrol : MonoBehaviour
         // ③ 决策（一步只做一次）：任一条成立就转身
         //    ⭐ 自带闸门，不会每物理步乱翻：转身后探针搬到另一侧、射线也指向反方向 → 条件自动消失
         if (!isGroundAhead || wallAhead) _dir = -_dir;
+        ApplyFacing();
 
         // ④ 交速度：x 归脚本（覆盖式）、y 归重力（原样保留）
         _rb.linearVelocityX = _dir * moveSpeed;
@@ -96,6 +105,17 @@ public class EnemyPatrol : MonoBehaviour
         {
             if (Mathf.Abs(c.normal.x) > 0.7f) { _dir = -_dir; return; }
         }
+    }
+
+    // 转身：只改视觉子树 x 的【符号】，幅值保持不变
+    //   脏检查：没变就不写（与 ScoreManager 同族 —— 别每帧无脑写渲染/变换属性）
+    private void ApplyFacing()
+    {
+        Vector3 s = visual.localScale;
+        float want = Mathf.Abs(s.x) * _dir;
+        if (Mathf.Approximately(s.x, want)) return;
+        s.x = want;
+        visual.localScale = s;
     }
 
     // ── ④ 可视化（复用玩家那套：只在选中该物体时画）──
