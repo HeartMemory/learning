@@ -24,12 +24,19 @@ public class PlayerController : MonoBehaviour
     [Header("视觉")]
     [SerializeField] private Transform visual;   // 拖 Player/Visual（只装视觉的子物体）
 
+    [Header("动画")]
+    [SerializeField] private Animator animator;   // 拖 Player/Visual/Body
+
     private Rigidbody2D _rb;
     private Collider2D _col;                                            // 🆕 真接触判定用它
     private readonly ContactPoint2D[] _contacts = new ContactPoint2D[8]; // 🆕 复用缓冲，别每物理步 new
     private InputAction _move;   // 查表一次就缓存（与 Camera.main 同理，别每帧查）
     private InputAction _jump;
     private int _facing = 1;                 // 当前朝向：1 = 朝右，-1 = 朝左
+                                             // ⭐ Animator 参数名缓存成 hash（与 `_move` / `Camera.main` 同族：查一次，别每次用字符串）
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
+
 
 
     // ── 两个"跨时钟的桥"：Update 写、FixedUpdate 读 ──
@@ -58,6 +65,11 @@ public class PlayerController : MonoBehaviour
         //   ⭐ "收集全部问题再停" 而不是 "报第一个就 return"：前者修一轮，后者修三轮
         bool wiringOk = true;
 
+        if (animator == null)
+        {
+            Debug.LogError("animator 槽位是空的：角色不会有动画", this);
+            wiringOk = false;
+        }
         if (visual == null)
         {
             Debug.LogError("visual 槽位是空的：转身要翻的是【视觉子树】，不是物理根", this);
@@ -148,6 +160,13 @@ public class PlayerController : MonoBehaviour
         // ⑥ ⭐ 全场唯一一次速度提交：x 归输入，y 归上面那套决策
         //    判据：一个物理步只能提交一次 —— 分两次赋值，后写的会覆盖先写的
         _rb.linearVelocity = new Vector2(_axis * moveSpeed, y);
+
+        // ⑦ 喂 Animator：脚本只报"事实"，播哪个由状态机自己决定
+        //    ⭐ 这就是 FSM 的"条件参数" —— 脚本【不认识】Idle/Run/Jump，只报 Speed / IsGrounded
+        //    ⭐ 为什么在 FixedUpdate：isGrounded 是【物理观测】，就近消费（"谁产生谁消费"）
+        animator.SetFloat(SpeedHash, Mathf.Abs(_axis));
+        animator.SetBool(GroundedHash, isGrounded);
+
     }
     // ⭐ 真接触判定：物理上真的"踩在"某个面上
     //    · normal 的方向约定：从【对方表面】指向【我】 → 站在地面上时 ≈ (0, 1)
