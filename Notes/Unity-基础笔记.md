@@ -2143,7 +2143,155 @@ _rb.linearVelocityX = _dir * moveSpeed;      // ⭐ 只碰 x，y 归重力（Uni
 - ⚠️ 改实例 ≠ 改模具（`Apply` / `Revert`）；别用"复制粘贴场景对象"来加新敌人
 - ⚠️ 新文件夹的 `.meta` 躺在**父目录**（`Assets/Prefabs.meta`）→ 提交时别漏
 
+## 19. 物理与表现分离 + `Order` 分层 + 单例 + Animator 动画纪律（10-05 · 第 7 号成品）
+
+> 今天三件事一次做完：**转身**（翻视觉子树）、**金币 + TMP 计分**（触发器 + 单例）、**角色 Animator**（Idle / Run / Jump）。共同主线是**分层**：物理 / 表现分开、两个时钟分开、两个写入者分开。
+
+### 一、物理与表现分离：为什么拆 `Visual` 子物体
+
+```
+Player（物理根：Rigidbody2D / BoxCollider2D / PlayerController）
+├── Visual            ← 看得见的（SpriteRenderer / Eye / Animator）
+│   └── Body          ← Animator 动画的是它自己的 localScale
+└── GroundCheck       ← 被代码 / 物理读的（探针）
+```
+
+⭐ **判据**：**看得见的进 `Visual`；被代码 / 物理读的留在物理根。**
+
+| 理由 | 现象 |
+|---|---|
+| **镜像会带上整棵子树** | 翻 `Visual` → 里面的 `Eye` 跟着翻 ✓；若把 `GroundCheck` 放进 `Visual`，**探针会被镜像到身后** → 接地判定失效 |
+| **负缩放对碰撞体不可靠** | `localScale.x = -1` 的**碰撞体**形状 / 接触法线会出问题 → 所以要翻"**没有碰撞体**"的那一层 |
+| **缩放动画很贵** | 动画驱动**带碰撞体**的物体缩放 = 物理引擎**每帧重建碰撞体形状**（还容易穿模） |
+
+### 二、转身：翻 `Visual.localScale.x`
+
+- ⭐ **负缩放 = 镜像**（不是"变窄"）；世界缩放 = 父级链**连乘** → 翻一层，整棵视觉子树一起镜像
+- ⚠️ **`localScale` 是属性 + 返回 struct** → 不能写 `visual.localScale.x = …`（**CS1612**）→ **取出 → 改 → 整体写回**（与本册第 4 章 `linearVelocity.y` 同一条规则）
+- ⭐ **脏检查**：**记"上次提交出去的那个值"**（`_appliedFacing` 是 int），别从浮点里反推 —— 与 `ScoreManager._lastDestroyed` 同一模式
+
+**`flipX` vs 翻 `localScale`（选型表）**：
+
+| 做法 | 影响范围 | 适合 |
+|---|---|---|
+| `SpriteRenderer.flipX` | **只有这一个 renderer**（子物体**不跟着翻**） | 单张整图 |
+| 翻**物理根**的 `localScale.x` | **整棵子树**（含探针 / 碰撞体） | ❌ 会坏物理 |
+| 翻 **`Visual`** 的 `localScale.x` | 只镜像视觉子树 | ✅ **推荐** |
+
+⚠️ **两者别同时用**（翻两次 = 翻回来）。
+
+### 三、转身写在哪个时钟？"谁产生，谁消费"
+
+| | 朝向由谁产生 | 转身写在哪 | 为什么 |
+|---|---|---|---|
+| **玩家** | `_axis` ← **`Update`**（读输入） | **`Update`** | 数据在 Update 产生 → **当帧就翻**，跟手 |
+| **敌人** | `_dir` ← **`FixedUpdate`**（看地 / 看墙 / 撞墙决策） | **`FixedUpdate`** | 数据在 FixedUpdate 产生 → 就近消费 |
+
+⭐ 补充：60fps 渲染 + 50Hz 物理 → 每秒约 10 帧**没有**物理步；转身只写 `FixedUpdate` 的话，那 10 帧里画面会"晚一拍"。
+**铁律不变**：`rb.linearVelocity` 这类**物理提交**只在 `FixedUpdate`、且一个物理步一次。
+
+### 四、`Order in Layer`：平局 = 未定义
+
+```
+① 排序图层 (Sorting Layer) → ② 图层内顺序 (Order in Layer) → ③ 距相机的距离（z）
+```
+
+**三级全相等 = 平局 → 结果没有承诺**。同一天里测到两组：
+
+| 平局 | 结果 |
+|---|---|
+| `Player`(0) vs `Tilemap`(0) | 玩家**赢**（一直可见） |
+| `Eye`(0) vs `Visual`(0) | 眼睛**输**（被身体盖住） |
+
+⚠️ "**层级里越靠下越后画**"只是**社区观察**，不是规则 → **要用 `Order in Layer` 明说**。
+
+| Order | 谁 |
+|---|---|
+| `0` | Tilemap 地形 |
+| `1` | Coin |
+| `2` / `3` | Enemy 的身体 / 眼睛 |
+| `3` / `4` | Player 的身体 / 眼睛 |
+
+- **`Order in Layer` 是静态的**：排序关系全局固定、不随位置变（"按 y 动态排序"是俯视 2D 的做法，横版不需要）
+- **一个 `Tilemap` = 一个渲染器 = 一个排序键** → 想"地形内部分前后"就**再开一个 Tilemap**
+- ⚠️ **排序图层（Sorting Layer）暂不加**：它存在 `ProjectSettings/TagManager.asset` → 加它就等于**动项目设置**（要走"保存项目 + 隐私自查 + 提交设置"）；等出现"背景 / 前景 / 粒子"时**一次性加齐**
+- ⚠️ **UI 不需要它**（`Canvas` 用**屏幕空间-叠加**时**不参与**这套排序）
+
+### 五、金币：触发器 + 层门卫（承 Breakout 的"自治"）
+
+- **自治**：`OnTriggerEnter2D` 里自己判断、自己消失 —— 全场 1 个玩家、N 个金币，**玩家代码不需要认识任何金币**
+- ⚠️ **勾「是触发器」**：只报"碰到了"，**不产生物理阻挡**（玩家不会被弹开 / 减速）
+- ⚠️ **两个碰撞体里至少一个带刚体**消息才会发出（玩家是 Dynamic → 够了；金币**不需要**刚体）
+- ⭐ **用层判定，不用标签**：`Player` 层 10-02 就建好了，而 `Player` **标签不存在**
+  - 判据：**层管"物理上允许不允许接触"（碰撞矩阵 / 射线掩码），标签管"这是什么"（业务身份）**
+- ⭐ **触发器不参与物理求解** → **"实心碰撞体要精确，触发器够用就行"**（宽容度大反而更好吃）
+- ⚠️「项目设置 → 物理 2D → 层碰撞矩阵」里 `Pickup × Player` 要打勾，否则**回调根本不发**
+- 消失用 `SetActive(false)` 而不是 `Destroy`（销毁贵、禁用便宜 —— 承第 6 章对象池）
+
+### 六、单例：`public static X Instance { get; private set; }`
+
+```csharp
+public static ScoreManager Instance { get; private set; }        // 类型级静态槽位
+void Awake()   { /* 重复挂载 → LogError + enabled = false + return */  Instance = this; }
+void OnDestroy(){ if (Instance == this) Instance = null; }       // 必须还的账
+```
+
+| 部分 | 给的能力 |
+|---|---|
+| `static` | ① 不需要实例就能访问 ② 全进程**只有一份** |
+| `public` | 跨类可读 |
+| `{ get; private set; }` | **自动属性**（编译器开隐藏字段）+ **读公开、写私有** → **唯一性靠访问级别守门** |
+
+- ⭐ **与 `event` 同一种思想**：`event` = "带门禁的委托字段"（外部只能 `+=`/`-=`，赋值 **CS0070**，第 13 章）；`{ get; private set; }` = "**带门禁的静态字段**"
+- ⭐ **同一机制你早用过**：`InputSystem.actions` 也是**静态属性** —— 写在代码里就能拿到，**不需要在场景里找任何物体**
+- **两笔账**：① `Instance` 可能为 `null` → `?.`；② 静态字段**不随场景卸载自动清** → `OnDestroy` 清入口（编辑器有域重载会重置，**构建后不会**）
+- ⭐ **判据（单例 vs 事件）**：**"我要找的是一个唯一的服务，还是广播一条消息？"** → 唯一的**服务**（计分员 / 游戏裁判 / 音源管理）用**单例**；一条**消息**（漏球 / 砖块清空）用**事件**
+- ⚠️ **`Awake` 顺序不确定** → static 入口的"读"要放在初始化之后（事件回调 / `Update`），别在自己的 `Awake` 里读别人 `Awake` 的产物
+- 进阶：懒加载 `_instance ??= FindFirstObjectByType<ScoreManager>()`（⚠️ Unity 6 里 `FindObjectOfType` 已**过时**）
+
+### 七、Animator：FSM 的落地 + 五条动画纪律
+
+**FSM 三角**（第 12 章那套）：
+
+| 要素 | Animator 里 |
+|---|---|
+| 状态 State | `Idle` / `Run` / `Jump` 三个方块 |
+| 条件 Parameter | `Speed`(float) / `IsGrounded`(bool) |
+| 转移 Transition | 方块之间的箭头（带条件） |
+
+⭐ **脚本只"报事实"，播哪个由状态机决定**：
+
+```csharp
+animator.SetFloat(SpeedHash, Mathf.Abs(_axis));
+animator.SetBool(GroundedHash, isGrounded);
+```
+
+`SpeedHash` / `GroundedHash` 用 `Animator.StringToHash` 缓存成 **`static readonly`**（与 `_move` / `Camera.main` 同族：**查一次就缓存**）。
+
+**⭐ 五条动画纪律**：
+
+1. **只动画"纯视觉、没有碰撞体"的那一层**（今天为此把 `SpriteRenderer` 从 `Visual` 再挪到 `Body`）
+2. **同一个属性只能有一个写入者** —— 脚本翻 `Visual.scale.x`（离散），Animator 动画 `Body.scale`（连续）→ **两个不同的 transform**
+3. **一个 clip 动过的属性，每个 clip 都要动、且首帧写基准值** —— 否则切状态时**上一个状态的值会残留**
+4. **`有退出时间 (Has Exit Time)` 全部取消勾选** —— 否则"当前动画播完才切"，动作**迟滞**（最常见的手感杀手）
+5. **转移条件默认是 AND**（列表全部满足）→ 要 OR 就**建两条**转移
+
+**其它要点**：
+
+- ⭐ **`Any State` 只给"任何状态都可能触发的打断"**（死亡 / 受击 / 眩晕）；`Idle ⇄ Run ⇄ Jump` 是**明确的有限转移** → 画明确箭头（⚠️ `Any State → Jump` 不能指向当前已在的状态，会自打断）
+- 三个特殊节点：**`入口 Entry`**（箭头指向的就是**默认状态**，**橙色** = 默认）、`Any State`、`出口 Exit`
+- 右键菜单**只对状态框生效**（空白处右键没有菜单）；画布平移 = **中键拖** 或 `Alt` + 左键；选中后按 **`F`** 聚焦
+- **clip 别留 0 秒长度**（1 帧恒定值也要给一个正的时间跨度）
+- `Animator` 的 `Update Mode`：本册第 10 章那条（`timeScale = 0` 要用 `Unscaled Time`）—— **本工程没有 `timeScale = 0`，保持 `Normal`**
+- ⚠️ `.anim` / `.controller` 都是**资产层**：改完必须 **`文件 → 保存项目`**（不是场景 `Ctrl+S`）
+- ⚠️ **动画参数名是字符串 → 拼错 / 大小写不对 = 静默失效**（与"回调名字写错"同族，第 18 章）
+
 ## 📌 回访清单（学到对应内容时回来重构）
+
+- [ ] **`Run` 动画周期与角色速度同步（10-05 记）**：`PlayerRun.anim` 固定 0.2s 一拍，与 `moveSpeed` 无关 → 调 State 的「速度」乘数或 `animator.speed`（`= 实际速度 / 基准速度`）；再学 **Blend Tree** 做"速度混合"
+- [ ] **视野只探一条水平线（10-05 记）**：`Physics2D.Raycast` 从身体中心水平发 → 玩家跳高就"看不见" → 加斜向射线或 `OverlapCircle` 视野（做"追逐 / 攻击"时一起）
+- [ ] **排序图层（10-05 记）**：出现"背景 / 前景 / 粒子"需求时**一次性加齐**（⚠️ 会动 `ProjectSettings` → 走"保存项目 + 隐私自查 + 提交设置"）
+- [ ] **单例懒加载对照（10-05 记）**：`Awake` 赋值 vs `??= FindFirstObjectByType<T>()` —— 对照"时序可靠"与"少一次接线"的取舍
 
 - [x] ~~学完 **Unity** 后：把 `CharacterBattle` 的类结构搬到 Unity 角色系统~~（**09-16 完成 ✓**：`CharacterClasses.cs` + `BattleDemo.cs` 跑通全流程，4 个环境坑已踩）
 - [ ] 学完 **prefab / 对象池**后：`Battle.Run` 里 `new Hero(...)` 的写法换成 Unity 的 `Instantiate`（09-22 打砖块时自然撞上）
