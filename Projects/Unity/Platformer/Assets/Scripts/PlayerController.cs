@@ -21,6 +21,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform groundCheck;     // 拖 Player/GroundCheck 进来
     [SerializeField] private LayerMask groundLayer;     // ⚠️ 只勾 Ground，不能勾 Player
 
+    [Header("裁判（装配期接线：把 GameManager 拖进来）")]
+    [SerializeField] private GameManager gameManager;
+
     [Header("视觉")]
     [SerializeField] private Transform visual;   // 拖 Player/Visual（只装视觉的子物体）
 
@@ -43,6 +46,7 @@ public class PlayerController : MonoBehaviour
     private float _axis;            // 电平语义：你【正推着】多少
     private int _jumpsLeft;         // 可消耗资源：起跳次数余额，落地回满
     private bool _jumpRequested;    // 边沿语义：这一帧【刚按下】
+    private bool _wasGrounded;      // 🆕 10-06：上一【物理步】的接地观测（边沿判据专用）
 
 
 
@@ -65,6 +69,11 @@ public class PlayerController : MonoBehaviour
         //   ⭐ "收集全部问题再停" 而不是 "报第一个就 return"：前者修一轮，后者修三轮
         bool wiringOk = true;
 
+        if (gameManager == null)
+        {
+            Debug.LogError("gameManager 槽是空的：死后玩家还能转身、还会读输入", this);
+            wiringOk = false;
+        }
         if (animator == null)
         {
             Debug.LogError("animator 槽位是空的：角色不会有动画", this);
@@ -104,6 +113,19 @@ public class PlayerController : MonoBehaviour
         _jumpsLeft = maxJumps;   // 开局次数置满
     }
 
+    // ── 订阅裁判的死亡广播：⭐ 谁关心谁订阅（裁判不认识玩家）──
+    //   ⚠️ 为什么用 Inspector 拖引用，而不是 GameManager.Instance：
+    //      不同对象的 Awake 顺序【不确定】→ OnEnable 里取 Instance 可能还是 null → 静默订阅失败
+    private void OnEnable() { if (gameManager != null) gameManager.OnGameOver += HandleGameOver; }
+    private void OnDisable() { if (gameManager != null) gameManager.OnGameOver -= HandleGameOver; }   // 谁订阅谁退订
+
+    private void HandleGameOver()
+    {
+        // ⭐ timeScale = 0 只停物理；Update 与"改渲染属性"都不吃它 → 死后还能转身
+        //    → 把整个脚本关掉：Update / FixedUpdate 一起停（输入、转身、交速度全停手）
+        enabled = false;
+    }
+
     void Update()
     {
         _axis = _move.ReadValue<Vector2>().x;         // 输入的"当前意图"，每帧拉一次
@@ -119,7 +141,6 @@ public class PlayerController : MonoBehaviour
         if (_axis > 0.01f) _facing = 1;
         else if (_axis < -0.01f) _facing = -1;
         ApplyFacing();
-
     }
 
     void FixedUpdate()
@@ -134,11 +155,17 @@ public class PlayerController : MonoBehaviour
         // ② y 先取出来：下面三处决策都靠它判断
         float y = _rb.linearVelocity.y;
 
-        // ③ 回满次数：⭐ 只在【停住或下落】时回满（y <= 0f）
-        //    判据：起跳后头一两步，探针还压在地里（圆心才抬升 0.1~0.2）→ 若写成 if (isGrounded) 无条件回满，
-        //          次数会被非法回满（空中连点能白送跳次）
-        //    ⭐ 通用判据：传感器有"跟不上状态变化"的那一瞬间，用它判状态时必须把这一瞬排除
-        if (isGrounded && y <= 0f) _jumpsLeft = maxJumps;
+        // ③ 回满次数（🔧 10-06 修）：从「看速度 y <= 0f」改成「看接地的【上升沿】」
+        //    · 病因（实测钉死）：静止接触的求解残差是 +3.489852E-05 —— **微正**！
+        //      而 `y <= 0f` 是【零容差】→ 移动落地那一步门被关掉 → 不回满
+        //      → 紧接着 `_jumpsLeft > 0` 不成立 → 跳被拒；而意图又被 ⑤ 即时作废
+        //      → 症状：落地立刻跳"跳不起来"，且控制台一声不响
+        //      ⚠️ 排查坑：`F4` 会把 +0.00003 打印成 0.0000 —— 要看符号就别信 F1/F2/F4
+        //    ⭐ 判据：不要用【连续量】（速度）判【离散状态】（有没有落地）；
+        //             离散状态用离散量记 —— 这里的离散量就是"上一步是否接地"
+        //    ⭐ 顺带解决了原注释 ③ 想防的事：起跳后那一两步是"接地 → 接地"（true → true），
+        //       不是上升沿 → 不回满 → 【不会白送次数】，再也不需要速度参与
+        if (isGrounded && !_wasGrounded) _jumpsLeft = maxJumps;
 
         // ④ 一次决策：y 只有两个去处
         //    · 起跳：y = jumpSpeed（【覆盖】不是累加 —— 覆盖才能让高度只由 jumpSpeed 决定）
@@ -167,6 +194,9 @@ public class PlayerController : MonoBehaviour
         animator.SetFloat(SpeedHash, Mathf.Abs(_axis));
         animator.SetBool(GroundedHash, isGrounded);
 
+        // 🆕 10-06：记下这一步的接地观测 —— ⚠️ 必须【每步】都更新，
+        //    否则它永远是 false → 每步都被当成上升沿 → 变成"每步无条件回满"（白送跳次）
+        _wasGrounded = isGrounded;
     }
     // ⭐ 真接触判定：物理上真的"踩在"某个面上
     //    · normal 的方向约定：从【对方表面】指向【我】 → 站在地面上时 ≈ (0, 1)
