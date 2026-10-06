@@ -312,6 +312,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   wallCheckDistance: 0.55
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 128
   visual: {fileID: 5024787251365077295}
 --- !u!1 &8398539724208403465
 GameObject:
