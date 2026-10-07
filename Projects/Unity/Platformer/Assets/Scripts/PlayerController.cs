@@ -113,13 +113,19 @@ public class PlayerController : MonoBehaviour
         _jumpsLeft = maxJumps;   // 开局次数置满
     }
 
-    // ── 订阅裁判的死亡广播：⭐ 谁关心谁订阅（裁判不认识玩家）──
+    // ── 订阅裁判的「结束」广播：⭐ 谁关心谁订阅（裁判不认识玩家）──
+    //   ⭐ 10-07 改口径：**订「结束」，不订「死」**
+    //      判据 —— "停手"是【游戏已结束】这件事，不是【死了】这件事：
+    //        昨天只有"死"一种结束，订 OnGameOver 恰好等价；
+    //        今天多了"赢"（OnGameWin），只订"死"就漏了 → 通关后角色还能转身。
     //   ⚠️ 为什么用 Inspector 拖引用，而不是 GameManager.Instance：
     //      不同对象的 Awake 顺序【不确定】→ OnEnable 里取 Instance 可能还是 null → 静默订阅失败
-    private void OnEnable() { if (gameManager != null) gameManager.OnGameOver += HandleGameOver; }
-    private void OnDisable() { if (gameManager != null) gameManager.OnGameOver -= HandleGameOver; }   // 谁订阅谁退订
+    // TODO ③：把下面两行的 `OnGameOver` 换成 GameManager 上那条「不管怎么结束」的事件
+    //   （只换事件名；`HandleGameEnded` 不动）
+    private void OnEnable() { if (gameManager != null) gameManager.OnGameEnded += HandleGameEnded; }
+    private void OnDisable() { if (gameManager != null) gameManager.OnGameEnded -= HandleGameEnded; }   // 谁订阅谁退订
 
-    private void HandleGameOver()
+    private void HandleGameEnded()   // ⭐ 由 HandleGameOver 改名：它现在管"死"也管"赢"
     {
         // ⭐ timeScale = 0 只停物理；Update 与"改渲染属性"都不吃它 → 死后还能转身
         //    → 把整个脚本关掉：Update / FixedUpdate 一起停（输入、转身、交速度全停手）

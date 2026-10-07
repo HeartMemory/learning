@@ -24,6 +24,15 @@ public class EnemyPatrol : MonoBehaviour
 
     [Header("前方障碍（撞墙预感）")]
     [SerializeField] private float wallCheckDistance = 0.55f;   // 碰撞体半宽 0.4 + 余量 0.15
+    [SerializeField] private LayerMask obstacleLayer;            // ⭐ 独立掩码：勾 Ground + Hazard（"挡我的东西"）
+
+    // ⭐ 为什么必须【再开一个】字段，不能继续借用 groundLayer：
+    //     "脚前有没有地" 和 "身体正前方有没有墙" 是【两个问题】——
+    //     过去两者恰好都是 Ground，所以共用一个字段没暴露问题；
+    //     但 Goal 是"只挡人、不站人"的东西，一旦把它塞进 Ground 层：
+    //       ① 脚前探针会以为"前方有地" → 敌人会走上 Goal
+    //       ② 还会污染玩家的接地判定（PlayerController.groundLayer 也是 Ground）
+    //     ⇒ 判据：一个掩码不兼职两件事
 
     [Header("伤害判定")]
     [SerializeField] private LayerMask playerLayer;      // 🆕 只勾 Player：碰到玩家 = 上报裁判
@@ -75,6 +84,14 @@ public class EnemyPatrol : MonoBehaviour
             Debug.LogError("GroundLayer 勾了 Enemy 层：悬空预感会永远命中自己 → 永不转身", this);
             wiringOk = false;
         }
+        // TODO ⑤：照上面几条的写法，给 obstacleLayer 补一条【空槽自检】
+        //   想清楚"忘了勾会怎样"：敌人会看不见任何墙 → 一路走到底 → 掉出平台
+        //   ⚠️ 报错文案要写清"缺哪个槽 + 后果"（照上面两条的句式）
+        if(obstacleLayer.value == 0)
+        {
+            Debug.LogError("obstacleLayer 一个层都没勾：撞墙预感看不到任何墙 → 敌人会一路走到底 → 掉出平台", this);
+            wiringOk = false;
+        }
         if (playerLayer.value == 0)
         {
             Debug.LogError("playerLayer 一个层都没勾：撞到玩家不会上报死亡", this);
@@ -95,7 +112,10 @@ public class EnemyPatrol : MonoBehaviour
         bool isGroundAhead = Physics2D.OverlapCircle(edgeCheck.position, checkRadius, groundLayer);
 
         //    · 身体高度正前方的障碍（撞墙预感）
-        bool wallAhead = Physics2D.Raycast(transform.position, new Vector2(_dir, 0f), wallCheckDistance, groundLayer);
+        //      TODO ⑥：把这一行的掩码换成你新加的那个字段
+        //        ⭐ 判据：这一行问的是"前面有没有【挡我的东西】"，不等于"脚下有没有地" ——
+        //          换完之后：地形（Ground）照旧会挡，而"只挡人、不站人"的东西（Hazard 层，如终点）也会被提前看到
+        bool wallAhead = Physics2D.Raycast(transform.position, new Vector2(_dir, 0f), wallCheckDistance, obstacleLayer);
 
         //    · 🆕 视线：与"看墙"同一个 API 家族，只换【掩码】+ 独立【距离】
         //      · 掩码只勾 Player → 不会命中自己（探针那种"命中自己"的防线这里天然不需要）

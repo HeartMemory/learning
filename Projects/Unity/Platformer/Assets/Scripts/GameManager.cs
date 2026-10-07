@@ -17,8 +17,9 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }   // ⭐ 唯一服务：让预制体一行就能找到裁判
 
-    public event Action OnGameOver;      // 一条消息：游戏结束（今天只有"死"这一种）
-    public event Action OnGameWin;       // 🆕 TODO ④：与 OnGameOver 对称的一条消息（名字你定，改完记得改订阅端）
+    public event Action OnGameOver;      // 一条消息：**只有"死"** —— 需要区分死/赢的订阅者订它（如结算面板）
+    public event Action OnGameWin;       // 一条消息：**只有"赢"**
+    public event Action OnGameEnded;     // ⭐ 一条消息：**不管怎么结束** —— 不关心原因的订阅者（如"玩家停手"）只订它
 
     private bool _isGameOver;            // ⭐ 幂等门卫：全场唯一的上锁处
 
@@ -50,6 +51,11 @@ public class GameManager : MonoBehaviour
         Debug.Log("[GameManager] 玩家死亡 → 世界冻结 + 广播 OnGameOver");
 
         OnGameOver?.Invoke();            // ③ 最后广播：谁关心谁反应（裁判不认识 UI）
+
+        // TODO ①：紧接着再广播那条"不管怎么结束"的消息
+        //   照镜子：上面那行怎么写，它就怎么写（只换事件名）
+        //   ⚠️ 漏了它 → "死"之后【不关心原因】的订阅者也收不到通知
+        OnGameEnded?.Invoke();
     }
 
     // ⭐ 所有【取胜源】的唯一入口（与 NotifyPlayerLost 逐行对称）
@@ -67,6 +73,10 @@ public class GameManager : MonoBehaviour
         Time.timeScale = 0f;
         Debug.Log("[GameManager] 玩家通关 → 世界冻结 + 广播 OnGameWin");
         OnGameWin?.Invoke();
+
+        // TODO ②：与 TODO ①【完全对应】—— 这里也必须广播那条"不管怎么结束"的消息
+        //   ⚠️ 两处缺一不可：只写一处 = bug 只修了一半
+        OnGameEnded?.Invoke();
     }
 
     public void Restart()
