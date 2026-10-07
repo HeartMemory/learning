@@ -1023,6 +1023,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DeathPanel
   gameManager: {fileID: 1966209549}
   overlayRoot: {fileID: 275329393}
+  resultText: {fileID: 0}
 --- !u!1001 &733702500
 PrefabInstance:
   m_ObjectHideFlags: 0
