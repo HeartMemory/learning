@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;      // 🆕 List<T>
+using Newtonsoft.Json;                 // 🆕 JsonConvert（Unity 官方 UPM 包 com.unity.nuget.newtonsoft-json）
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -12,6 +14,7 @@ using UnityEngine.SceneManagement;
 //  ⭐ 判据分层：
 //     · 唯一的【服务】用单例 —— 听众只有 1 个，且敌人是【预制体】，裁判拖不了它的引用
 //     · 一条【消息】用事件 —— 听众未知 / 会变
+//  🆕 10-08：多关卡 —— 加一张"关卡配置表"（从 Assets/Data/levels.json 读）+ LoadNextLevel()
 // ══════════════════════════════════════════════════════════════
 public class GameManager : MonoBehaviour
 {
@@ -23,6 +26,10 @@ public class GameManager : MonoBehaviour
 
     private bool _isGameOver;            // ⭐ 幂等门卫：全场唯一的上锁处
 
+    // ═══════ 🆕 多关卡（10-08）═══════
+    [SerializeField] private TextAsset levelConfig;   // 拖 Assets/Data/levels.json 进来
+    private List<LevelData> _levels = new List<LevelData>();   // 解析出来的关卡表（Awake 读一次，之后复用）
+
     private void Awake()
     {
         // ⭐ 单例自检：静态槽位不随场景卸载自动清 → 重开场景时可能残留旧值
@@ -33,6 +40,31 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // ═══════ 关卡配置表（10-08 · 多关卡 · 已实现）═══════
+        //  三个关键点：
+        //    ① ⭐ **数据来源是 `levelConfig.text`**，不是 `File.ReadAllText` ——
+        //       `TextAsset` 已经替你把文件读好了（Unity 里"资产"取代了"文件路径"）
+        //    ② 尖括号里填【整个 JSON 对应的类型】：本表顶层是【数组】⇒ `List<LevelData>`
+        //    ③ 失败分两种，处理【不同】：
+        //       · 空槽 / 解析出空表 → `LogError`（消息带上【后果】）+ **不 return**
+        //         （配置坏了只是"下一关"废了，"死 / 赢"两条链路还得照常工作）
+        //       · JSON 格式坏 → **不 catch，让它崩** ← ⭐ 知情的选择（10-08 定的）：
+        //         崩在 `Awake` 的真实代价 = 该组件剩余初始化跳过 + 一条红字
+        //         （Unity 会捕获异常，**其他组件照常初始化**）
+        //         ⇒ 对"不会随时看控制台"的人来说，**崩才是最响亮的可见失败**
+        if(levelConfig == null)
+        {
+            Debug.LogError("[GameManager] levelConfig 槽是空的：关卡表永远不会被读", this);
+        }
+        else
+        {
+            _levels = JsonConvert.DeserializeObject<List<LevelData>>(levelConfig.text);
+            if(_levels == null || _levels.Count == 0)
+            {
+                Debug.LogError("[GameManager] 关卡表解析失败或为空：点「下一关」会失败", this);
+            }
+        }
     }
 
     private void OnDestroy()
@@ -52,30 +84,18 @@ public class GameManager : MonoBehaviour
 
         OnGameOver?.Invoke();            // ③ 最后广播：谁关心谁反应（裁判不认识 UI）
 
-        // TODO ①：紧接着再广播那条"不管怎么结束"的消息
-        //   照镜子：上面那行怎么写，它就怎么写（只换事件名）
-        //   ⚠️ 漏了它 → "死"之后【不关心原因】的订阅者也收不到通知
         OnGameEnded?.Invoke();
     }
 
     // ⭐ 所有【取胜源】的唯一入口（与 NotifyPlayerLost 逐行对称）
     public void NotifyPlayerWon()
     {
-        // TODO ⑤：三件事，顺序与 NotifyPlayerLost 完全一致（上锁 → 改状态 → 广播）
-        //   自检三问（写之前先答，别先抄）：
-        //     ① 幂等门卫：用【同一个】_isGameOver，还是【另起一个】bool？
-        //        两种做法各自会在什么情形下出错？
-        //        提示：玩家最后一步可能【同时】踩中 Goal 与 FailZone —— 那一刻谁该赢？
-        //     ② timeScale = 0 为什么夹在"上锁"和"广播"之间，而不是放最后？
-        //     ③ Debug.Log 那行怎么写，才能在控制台里和"死"那行一眼分开？
         if (_isGameOver) return;         // ① 先上锁（第二声、第三声都在这儿被吃掉）
         _isGameOver = true;
         Time.timeScale = 0f;
         Debug.Log("[GameManager] 玩家通关 → 世界冻结 + 广播 OnGameWin");
         OnGameWin?.Invoke();
 
-        // TODO ②：与 TODO ①【完全对应】—— 这里也必须广播那条"不管怎么结束"的消息
-        //   ⚠️ 两处缺一不可：只写一处 = bug 只修了一半
         OnGameEnded?.Invoke();
     }
 
@@ -83,5 +103,25 @@ public class GameManager : MonoBehaviour
     {
         Time.timeScale = 1f;             // ⚠️ 必须先还 timeScale，否则新场景一开场就是冻结的
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    // ═══════ 🆕 TODO B（10-08 · 多关卡）：加载【下一关】 ═══════
+    //  判据链（写之前先答）：
+    //    ① **"我现在是哪一关"怎么认出来？**
+    //       提示：`SceneManager.GetActiveScene().name` 与表里的 `SceneName` 能对上 ⇒ 不需要额外记状态
+    //    ② 若"当前场景名"在表里【找不到】怎么办？
+    //       （开发期很常见：直接 Play 了某一关、场景改名了 …）
+    //    ③ 若【已经是最后一关】→ 现在还没有"全部通关"的画面 ⇒ 先 `Debug.Log` 收尾（留给打磨日）
+    //    ④ ⚠️ **与 `Restart()` 同一条教训**：先 `Time.timeScale = 1f`，再 `LoadScene`
+    //       （照镜子：`Restart()` 就在上面几行，那两行就是模板）
+    //    ⑤ 查表走 `List.Find` 还是建个 `Dictionary<int, LevelData>`？
+    //       —— 两个都行。选完在心里说一句"为什么"（承今天的泛型：容器按【访问方式】选）
+    //    ⑥ ⭐ **用【场景名】加载**（`LoadScene(level.SceneName)`），不要用 `buildIndex`：
+    //       配置表里存的就是名字；而且【索引会漂移】——在 Build Settings 里挪一下顺序，所有索引全变，名字不会
+    //    ⑦ ⭐ "**已经是最后一关**"【不该崩】：那是正常游戏进度；
+    //       该崩的是"配置坏了 / 当前关在表里找不到"（那是数据问题）
+    public void LoadNextLevel()
+    {
+        throw new NotImplementedException("TODO B：找下一关 → 还 timeScale → LoadScene");
     }
 }
