@@ -2455,6 +2455,92 @@ if (isGrounded && !_wasGrounded) _jumpsLeft = maxJumps;   // 完全不看速度
 
 ---
 
+## 22. UI 交互事件的两条路：`UnityEvent` vs `EventSystems` 接口（10-08 · 多关卡）
+
+### 一、地图：两条完全不同的路
+
+| | **路①：`UnityEvent`（组件上的 `onXxx`）** | **路②：`EventSystems` 接口** |
+|---|---|---|
+| 长相 | 组件上的**字段**（`Button.onClick`） | 你要**实现**的接口（`IPointerDownHandler`） |
+| 怎么接 | **从外面挂**：`AddListener` / Inspector 拖 | **自己实现**：写在自己的组件上 |
+| 你在扩展谁 | **按钮**（它不动，你加监听者） | **你自己**（写一个新组件） |
+| Inspector 可见 | ✅ | ❌（纯代码） |
+| 多播 | ✅ 多个监听者 | ❌ 一个组件一份实现 |
+| 适合 | "点一下 → 做件事" | "**我要定义整个交互过程**"（按住 / 拖动 / 悬停） |
+
+⭐ **判据：看"谁在做主"**
+> **别人通知我 → 我去【挂】它**（`UnityEvent`）；**我要参与交互 → 我【实现】它**（接口）
+
+💡 生活模型：`onClick` = **门铃**（别人按、我响应）；`IPointerDownHandler` = **我自己就是门**（我定义"被敲时怎么办"）
+
+### 二、路① 全家福（常用组件的 `onXxx`）
+
+| 组件 | 事件 | 参数 |
+|---|---|---|
+| `Button` | `onClick` | **无参** |
+| `Toggle` | `onValueChanged` | `bool` |
+| `Slider` | `onValueChanged` | `float` |
+| `TMP_InputField` | `onValueChanged` / `onEndEdit` / `onSubmit` | `string` |
+| `TMP_Dropdown` | `onValueChanged` | `int` |
+| `ScrollRect` | `onValueChanged` | `Vector2` |
+
+⭐ 它们全是 **`UnityEvent` 家族**（`UnityEvent` / `UnityEvent<T0>` …）⇒ `onClick` 就是**最基础的无参版**
+⭐ 推论：**`onClick` 只能挂「无参 `void`」的方法**（方法组直接能传，如 `gameManager.LoadNextLevel`）；要带参数就得上别的 `UnityEvent<T>`
+
+### 三、⭐ 为什么 UGUI 不用标准 C# `event`，而自造 `UnityEvent`？
+
+| 动机 | 说明 |
+|---|---|
+| **能在 Inspector 里配置** | 策划 / 美术不改代码也能接线（`RestartButton` 就是这么接的） |
+| 代价 | 性能与类型安全**都不如**标准事件；接线**藏在场景里** ⇒ **方法一改名就静默失联**（Inspector 显示 `Missing`） |
+
+⭐ 判据：**"接线"越靠近代码，越不容易静默失联** —— 代码里 `AddListener` 改名会**编译报错**；Inspector 拖的只会悄悄变 `Missing`
+
+⭐ 两者 API 对照（**干的是同一件事**）：
+
+| 标准 C# 事件 | UGUI 的 `UnityEvent` |
+|---|---|
+| `x.Event += 方法` | `button.onClick.`**`AddListener`**`(方法)` |
+| `x.Event -= 方法` | `button.onClick.`**`RemoveListener`**`(方法)` |
+
+⇒ 「**谁挂谁摘**」这条规矩**一字不改地适用**
+
+### 四、路② 全家福（指针 / 拖拽接口）
+
+| 接口 | 什么时候被调 |
+|---|---|
+| `IPointerClickHandler` | 点击 |
+| `IPointerEnterHandler` / `IPointerExitHandler` | 悬停进 / 出 |
+| **`IPointerDownHandler` / `IPointerUpHandler`** | 按下 / 抬起 |
+| `IBeginDragHandler` / `IDragHandler` / `IEndDragHandler` | 拖拽三段 |
+| `IDropHandler` | 放下 |
+| `IScrollHandler` | 滚轮 |
+| `ISubmitHandler` / `ICancelHandler` | 键盘 / 手柄 |
+
+### 五、⭐ 回链：`HoldButton` 就是路②
+
+Breakout 的触屏「按住」按钮（**第 15 章**）实现的是 `IPointerDownHandler` / `IPointerUpHandler`，自己维护 `IsHeld`。
+
+⇒ 当时要的是【**按住**】而不是【点一下】—— **`onClick` 根本做不到**（它只报"点完了"，不报"还按着"）⇒ 必须走接口 ✓
+
+### 六、桥：`EventTrigger` 组件（了解级）
+
+它让你**不写接口**也能在 Inspector 里给"指针事件"挂方法 ⇒ 相当于「**用路①的方式使用路②**」。
+
+### 七、别混淆：Input System 是**另一层**
+
+| 路 | 例子 | 属于哪一层 |
+|---|---|---|
+| **Input System 的回调** | `InputAction.performed` / `.canceled` | **输入设备层**（不是 UI） |
+
+（Breakout 用新输入系统时见过它 —— 和 UI 事件是**两层东西**。）
+
+### 八、一句话判据（带走）
+
+> **"点一下就完事" → 挂 `onClick`；"我要定义整个交互过程（按住 / 拖动 / 悬停）" → 实现 `EventSystems` 接口。**
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`CameraFollow` 的 `minX` / `maxX` 改成「运行时算」（10-07 记 · ⏰ 排 10-10 打磨日）**：现在按 **16:9 写死**，但它们其实是**屏幕宽度的函数**（`halfWidth = orthographicSize × aspect`）—— 分辨率一变，"屏幕外沿 = 关卡边界"就不成立 ⇒ 会退化成"**在关卡里就死**"或"**出了关卡还不死**"。改法 = `Awake` / `Start` 里用 `Camera.aspect` 算一次（或在 `OnValidate` 刷新）
