@@ -1528,6 +1528,399 @@ public static bool Approximately(float a, float b)
 
 ---
 
+## 40. `object`：万物之根与三种比较（10-08 · 计基随行 · 泛型前置）
+
+### 一、`object` 是什么：关键字别名 + 单根继承
+
+- `object` = **`System.Object` 的关键字别名**（同 `int` = `System.Int32`、`string` = `System.String`）
+- C# 是**单根继承**：`class` / `struct` / `enum` / 数组 / 委托 **全部**（直接或间接）继承 `object`（这是 C# 与 C++ 的一个分野）
+- ⚠️ **反直觉点**：`int` 也继承 `object`，但它**仍是值类型**（数据内联在"所在的地方"）→ **"继承自 `object`" 讲的是类型系统的血缘，不等于"住在堆上"**
+
+判据（往上数三代）：
+
+```csharp
+typeof(int).BaseType        // System.ValueType
+typeof(ValueType).BaseType  // System.Object     ← 值类型也是 object 的后代
+typeof(SomeClass).BaseType  // System.Object     ← 不写基类就隐式继承它
+```
+
+### 二、共同祖先带来：四个"人人都有"的方法
+
+| 方法 | 虚吗 | 作用 | 备注 |
+|---|---|---|---|
+| `ToString()` | ✅ | 转字符串 | 默认打印类型全名 |
+| `Equals(object)` | ✅ | 判"相不相等" | **默认实现 = 比身份** |
+| `GetHashCode()` | ✅ | 哈希值（`Dictionary` 用） | 改 `Equals` 必须一起改 |
+| `GetType()` | ❌ **不可重写** | 返回**真实类型** | 它是**事实**，不能改口 —— 第六节破案就靠它 |
+
+### 三、`Equals` 是**两个**东西（最容易混）
+
+| 写法 | 身份 | 比什么 |
+|---|---|---|
+| `a.Equals(b)` | **虚实例方法** `Object.Equals(object)` | 默认 = 引用相等；子类可**重写**成内容比较（`string` 就重写了） |
+| `Object.Equals(a, b)` | **静态方法** | null 安全的内容比较（先处理两端 null / 一端 null） |
+
+⚠️ **三件套纪律**：重写 `Equals(object)` 时，必须**同时**重写 `GetHashCode()` **和**静态 `Equals(object, object)` —— 否则会出现"`a.Equals(b)` 为 true、`Equals(a,b)` 为 false"的精神分裂。
+
+### 四、`ReferenceEquals`：只认"身份"
+
+- **静态方法、不可重写**（"是不是同一个对象"是**事实**，改不了）→ 只回答：**两个引用是否指向堆上同一个对象**
+- 两端都是 `null` → `true`（"都不指向"也算"指向同一个"）
+- ⛔ **对值类型是废的**：传参时**各装一次箱** → 两个不同的箱子：
+
+```csharp
+object.ReferenceEquals(1, 1)   // false（不是 bug，是两次装箱）
+```
+
+### 五、⭐ 三种比较对照（本节判据核心）
+
+| 比较 | 绑定时机 | 比什么 | 值类型能用吗 |
+|---|---|---|---|
+| `==` | **编译期**（按变量**静态类型**；运算符**非虚**） | 由类型定义（`object` 比身份 / `string` 比内容） | 可用 |
+| `a.Equals(b)` | **运行期**（**虚方法**，按**真实类型**分派） | 由真实类型决定 | 可用 |
+| `ReferenceEquals` | 运行期 | **只比身份** | ⛔ 不要用 |
+
+⭐ **一句话**：**`==` 看【编译期认定的类型】办事；`Equals` 拆开箱子看【运行期的真实类型】办事。**
+
+### 六、实测破案（今天的思考题）
+
+```csharp
+int n = 42;
+object a = n;   // 装箱①
+object b = n;   // 装箱②：另一个箱子（各装各的）
+Console.WriteLine(a == b);                        // False
+Console.WriteLine(object.ReferenceEquals(a, b));  // False
+Console.WriteLine(a.Equals(b));                   // True   ← 反直觉的那个
+Console.WriteLine(a.GetType());                   // System.Int32
+```
+
+| 表达式 | 机制 | 结果 |
+|---|---|---|
+| `a == b` | `==` **非虚** → 编译期按静态类型 `object` 选 `object.operator==` → **引用比较** | False |
+| `ReferenceEquals(a, b)` | 两个箱子是两个对象 → 身份不同 | False |
+| `a.Equals(b)` | **虚方法** → 运行期按箱子真实类型 `Int32` 分派到 `Int32.Equals` → **值比较** | **True** |
+
+- **铁证** = `a.GetType()` 打印 `System.Int32`：**变量声明的样子是 `object`，里面的东西是 `int`**
+- 💡 模型：`object a = n` = 把钞票装进信封；`a == b` 在**信封外比收件人**（两个信封必不同）；`a.Equals(b)` **拆开信封看里面的钱**（都是 42 → 相等）
+
+### 七、与第 38 章第二节的衔接
+
+- 第 38 章讲的是**具体形状**：`TreeNode` 是 `class` 且**没重载 `operator ==`** → `==` 走引用相等
+- 本节补的是**机制**：为什么"没重载就比身份"（`==` **非虚 + 编译期绑定**）；为什么"**重写 `Equals` ≠ `==` 也变了**"（两条**独立**的路，不重载运算符就永远是引用比较）
+
+---
+
+## 41. 泛型（Generics）：类型也是参数 + 约束（10-08 · 主线）
+
+### 一、本质：把「类型」也变成参数（承接当天的装箱 / 拆箱）
+
+| | 普通参数 | 泛型参数 |
+|---|---|---|
+| 变的是什么 | **值** | **类型** |
+| 例子 | `Add(int a, int b)` 里的 `a` / `b` | `List<int>` 里的那个 `int` |
+
+- 编译器拿到具体类型后**为它生成一份专用代码** ⇒ **0 装箱 / 0 转型检查 / 编译期就拦错** —— **不是语法糖，是把运行期检查搬到编译期**
+- 生活模型：`ArrayList` = **万能纸箱**（什么都能塞，取出要拆箱 + 转型，错在**运行期**）；`List<T>` = **标签写明用途的箱子**（塞错**编译期**就被拦）
+
+### 二、一直在用，只是没自己写过
+
+`List<T>` / `Dictionary<K,V>` / `Queue<T>` / `Stack<T>` / `IReadOnlyList<T>` / `Func<int,int,int>` —— 全是泛型。
+
+⭐ **`` `N `` 就是「类型参数个数」**（反射里的通用记号）：
+
+| 类型 | `GetType().Name` |
+|---|---|
+| `List<int>` | `` List`1 `` |
+| `Dictionary<int, LevelData>` | `` Dictionary`2 `` |
+| `(bool ok, int height)` | **`` ValueTuple`2 ``** ← 承第 39 章那条实测 |
+
+### 三、⭐ 约束（`where`）：不是「继承」，是「**许可证**」
+
+**冒号后面站的不是一种东西**，看清楚它是什么：
+
+| 写法 | 冒号后是什么 | 语义 |
+|---|---|---|
+| `where T : Animal` | 一个**类型** | **这才是继承**（血缘） |
+| `where T : IComparable<T>` | 一个**接口** | 实现（资格） |
+| `where T : new()` | **一段语法要求** | 有 **public 无参构造**（资格） |
+| `where T : class` / `struct` | **关键字** | 引用类型 / 值类型（资格） |
+| `where T : U` | **另一个类型参数** | T 必须是 U 的派生 |
+
+- ⭐ **`new()` 的精确含义 = public 【无参】构造** —— 不是"有构造函数"：`class B { public B(int x) {} }`（只有带参构造）**不满足**（带参构造把**隐式无参构造顶掉了**）；`struct` **天生满足**
+- ⭐ **`new()` 必须写在约束列表【最后】**
+- ⭐ 一句话判据：**在你写的泛型代码里，能对 `T` 做什么，完全取决于编译器【知道】`T` 有什么能力** ⇒ 约束就是你交给编译器的**证明**
+- 💡 生活模型：**继承 = 血缘（你爸是谁）；约束 = 资格（报名条件）**
+
+### 四、⭐ 今天亲手撞的四个报错（**约束四连**）
+
+| 错误码 | **报在哪** | 原因 | 修法 |
+|---|---|---|---|
+| **CS1061** | 定义处（方法体内） | **没写约束**就调用 `T` 的方法（`a.CompareTo(b)`） | 补 `where T : IComparable<T>` |
+| **CS0304** | 定义处（方法体内） | 写了 `new T()` 却**没写** `new()` 约束 | 补 `where T : new()` |
+| **CS0401** | 定义处（约束列表） | `new()` **没排在最后** | 把 `new()` 挪到末尾 |
+| **CS0310** | ⭐ **调用处**（填 `T` 的地方） | 填进来的类型**不满足**约束（`LevelData` 没有 public 无参构造） | 换类型；或（**慎重**）给类型补无参构造 |
+
+⭐⭐ **归纳（一句话）**：**约束的错只有三个阶段 —— ① 没写（定义处）② 写错位置（定义处）③ 填进来的类型不合格（调用处）。**
+
+⚠️ 顺带一条机制：**泛型定义只是模板，约束检查发生在"关闭泛型"那一刻**（即给 `T` 填具体类型时）—— 所以 CS0310 报在**调用点**而不是定义处。
+
+### 五、⭐⭐ 运算符是**要不来**的（今天最硬的一条）
+
+`if (i > result)` 在 `where T : IComparable<T>` 下**依然报 CS0019**（运算符 `>` 无法应用于 `T` 和 `T`）。
+
+原因：「能比较」在 C# 里有**两扇不同的门**：
+
+| 门 | 长什么样 | 谁提供 | 约束能要来吗 |
+|---|---|---|---|
+| **接口 `IComparable<T>`** | `a.CompareTo(b)`（**方法**） | 类型实现接口 | ✅ 能 |
+| **运算符 `>` / `<`** | `a > b` | 语言的**运算符重载** | ❌ **要不来** |
+
+⭐ 判据：**约束只承诺"接口里的成员"**（方法 / 属性 / 事件 / 索引器）—— **运算符不在成员清单里**。
+⇒ 泛型里比大小的**标准写法是 `CompareTo`**，不是 `>`。（了解级：C# 11 的 `IComparisonOperators<T,T,bool>`（静态抽象接口成员）**能**约束运算符，属高级特性。）
+
+### 六、同批撞过的其它报错（非约束类）
+
+| 错误码 | 见到的样子 | 原因 |
+|---|---|---|
+| **CS0119** | `predicate(T)` / `if (T != System.Int32)` | **`T` 是【类型】不是【实例】** —— 类型不能当参数、不能参与 `!=`（"图纸" ≠ "图纸造出来的那一个东西"） |
+| **CS0161** | 块体方法 | **并非所有代码路径都返回值**（忘了 `return`） |
+| **CS0029 / CS0030** | `LevelData x = CreateDefault<List<int>>();` | `T` 与具体类型之间**不能隐式转换** —— 填了类型参数，它会**贯穿整条链路**（返回类型 → 变量类型 → 后续成员访问），改一处不够 |
+| **CS1525 / CS1002** | `=>` 后面空着 | `=>`（表达式主体）后面**必须跟一个表达式**；`foreach` / `if` / `return` 是**语句** ⇒ 多语句必须用 `{ }` 块体 |
+
+### 七、落地：`Largest<T>` 由三样东西拼成（可复用配方）
+
+| 零件 | 写在哪 | 管什么 |
+|---|---|---|
+| **约束** | 签名上 `where T : IComparable<T>` | **要能力**（编译期证明） |
+| **契约** | 方法体最前面（`if (items.Count == 0) throw …`） | **边界怎么处理**（见第 42 章） |
+| **实现** | 身体里 `if (i.CompareTo(result) > 0) …` | **用能力**（返回值：负 / 0 / 正） |
+
+---
+
+## 42. 契约 + 「参数 / 状态」异常家族（10-08 · 写 `Largest` 时顺带学到）
+
+### 一、契约是什么
+
+> **契约 = 方法对【边界输入】的承诺。** 它不是语法，是**你对外答应的事**。
+
+| 载体 | 例子 | 它在承诺 |
+|---|---|---|
+| **异常** | `throw new InvalidOperationException(...)` | "这种情况下我会炸"（响亮） |
+| **Try 前缀** | `int.TryParse` / `Dictionary.TryGetValue` | "我**不**炸，用返回值告诉你成不成" |
+| **可空返回** | `T?` | "可能没有" |
+| **doc 注释 / 普通注释** | `/// <exception ...>` / `// 契约：空列表 → 抛 …` | 写给调用方（**三个月后你就是调用方**） |
+| **单元测试** | — | 契约的**可执行版本** |
+
+### 二、⭐ 四种「我不能这么干」（崩溃 → 原因 → 什么时候用它）
+
+| 异常 | 崩溃时机 | 用它的时候 | 例子 |
+|---|---|---|---|
+| `ArgumentNullException` | 参数是 **`null`** | 这个参数**不能是 null** | `Sort(list)` 收到 `null` |
+| `ArgumentException` | 参数**值**不合适 | 值非法，但**说不清是"越界"还是别的** | 传了不可能的组合 |
+| `ArgumentOutOfRangeException` | 参数**数值**越界 | 有**明确合法区间** | 页码为 `-1` |
+| **`InvalidOperationException`** | 参数**本身没毛病**，但**此刻做不了这件事** | **对象/序列的状态**不允许 | ⭐ **今天写的 `Largest(空列表)` 用的就是它**（与 LINQ `Max()` 一致） |
+
+⭐ **判据**：**"参数本身是坏的" → Argument 系；"参数没毛病、但此刻干不了" → `InvalidOperationException`。**
+
+### 三、⭐⭐ 本机实测的继承树（PowerShell 7.6.5 / .NET 10.0.11 · 反射实测）
+
+```
+SystemException
+ ├─ ArgumentException                     ← 父：参数有问题
+ │   ├─ ArgumentNullException             ← 参数是 null
+ │   ├─ ArgumentOutOfRangeException       ← 参数数值越界
+ │   └─ （还有一批细分兄弟：DecoderFallbackException / EncoderFallbackException /
+ │        CultureNotFoundException / RegexParseException / InvalidEnumArgumentException …）
+ └─ InvalidOperationException             ← ⚠️ 另一支！【不是】 Argument 家族
+```
+
+⭐⭐ **反直觉点**：**"`ArgumentNullException` 这种的"同族常用成员只有 3 个**（1 父 + 2 子）—— **`InvalidOperationException` 的基类是 `SystemException`，跟 Argument 家族是"堂兄弟"而不是"亲兄弟"**。
+
+（实测命令：反射扫所有程序集里 `BaseType == ArgumentException` 的类型。）
+
+### 四、判据：`catch` 的两个规矩
+
+| 规矩 | 依据 |
+|---|---|
+| **`catch (ArgumentException)` 一次能接住两个子类** | 父类 catch **能捕获子类异常** |
+| **`catch` 必须"子类在前、父类在后"** | 自上而下**最早匹配获胜** ⇒ 父类写前面会把子类的分支**吃掉**（永远执行不到） |
+
+### 五、抛与接的实操
+
+| 写法 | 要点 |
+|---|---|
+| `throw new X("msg")` | ⚠️ **必须有 `new`**（`throw` 后面要的是**异常对象**不是类型）；消息字符串是**崩溃时唯一的线索** |
+| 门卫位置 | **放在方法最前面**（"进门先查证件"）⇒ 否则已经在坏参数上跑了一半逻辑才炸 |
+| `throw;` vs `throw ex;` | 前者**原样重抛、保留堆栈** ✅；后者把堆栈**重置到这一行** ⛔ |
+| 快捷门卫（.NET 6+） | `ArgumentNullException.ThrowIfNull(items);`、`ArgumentException.ThrowIfNullOrEmpty(s);` —— 一行完成"检查 + 抛" |
+
+### 六、⚠️ 反例：`return default!` 会造「假值」
+
+空集合若 `return default!;`：`int` → **`0`**（**看起来完全合法**）、引用类型 → `null`。
+
+⇒ 调用方**分不出**"空"和"最大值真的是 0" —— 与第 40 章「值域含 0 时不能用 0 当哨兵」是**同一族问题**：**别让"看起来合法"的空值混进正常值域**。
+
+---
+
+## 43. 文件读写 + JSON 配置表（10-08 · 提前学 10-09 的内容）
+
+### 一、本质：一切麻烦都来自「外面」
+
+> **文件读写的核心不是"怎么读"，而是"读砸了怎么办"。**
+
+磁盘不在你程序里，所以它可能：**不存在 / 目录不存在 / 被别的程序占用 / 权限不够 / 编码不对 / 内容不是你以为的格式**。
+
+### 二、⭐⭐ 相对路径的基准 = **进程工作目录**（本课第一坑）
+
+| 基准 API | 给什么 |
+|---|---|
+| `Directory.GetCurrentDirectory()` | **当前工作目录** ← 相对路径就是相对它解析 |
+| `AppContext.BaseDirectory` | 程序集所在目录（`bin/Debug/net8.0/`） |
+
+**本机实测**：
+
+```
+【基准 ①】当前工作目录   = D:\...\CSharpPractice\2026\10\08\FileIO          ← dotnet run 设成【项目目录】
+【基准 ②】程序集所在目录 = D:\...\FileIO\bin\Debug\net8.0\
+```
+
+⇒ ⭐ 同一个字符串 `data/levels.json`：`dotnet run` 读得到；**直接跑 `bin/...\FileIO.exe` 就读不到**（基准变成了输出目录）。
+⇒ 这就是 Unity 里"**编辑器能跑、打包后失效**"的同一种病根。**找不到文件时，第一件事是看异常消息里的绝对路径。**
+
+### 三、API 速查表（本课全部）
+
+| 想干 | API | 备注 |
+|---|---|---|
+| 读**全部文本** | `File.ReadAllText(path)` | 小文件（配置表）首选；**不需要 `using`**（内部自己开关流） |
+| 读成**行数组** | `File.ReadAllLines(path)` | |
+| **写**全部文本 | `File.WriteAllText(path, text)` | 会**覆盖**原文件 |
+| **追加** | `File.AppendAllText(path, text)` | |
+| 判存在 | `File.Exists(path)` / `Directory.Exists(path)` | |
+| 建目录 | `Directory.CreateDirectory(dir)` | ⭐ **已存在也不报错** |
+| **拼路径** | **`Path.Combine(目录, 文件名)`** | ⭐ 永远别手拼 `/` 或 `\` |
+| 临时目录 | `Path.GetTempPath()` | 练习/临时产物丢这儿，不污染仓库 |
+| 流式（自己开） | `new StreamReader(path)` + `using` | ⭐ 判据：**谁开的谁关** |
+
+### 四、⭐ 契约两条路（承第 42 章）
+
+| 风格 | 形状 | 什么时候选 |
+|---|---|---|
+| **抛** | `File.ReadAllText` —— 不存在直接抛 | "文件必须有" |
+| **Try** | `bool TryXxx(入参, out 结果)` —— 先 `File.Exists` 或 `try/catch` | "文件可以没有"（**配置 / 存档**多走这条） |
+
+⭐ 判据：**"文件缺失"是【异常情况】还是【正常情况】？**
+⚠️ 并且：**Try 契约 ≠ 吞掉一切异常** —— 只接【预期】的（文件层 + 解析层），**拼写错 / 逻辑错应当继续冒**（别替 bug 捂盖子）。
+
+### 五、JSON：`System.Text.Json`（.NET 内置，不用装包）
+
+| 方向 | API |
+|---|---|
+| 文本 → 对象 | `JsonSerializer.Deserialize<T>(json)`（返回 **`T?`**） |
+| 对象 → 文本 | `JsonSerializer.Serialize(obj)` |
+
+- 拆词：**`serial` = 串行** ⇒ serialize = "把**结构化**的对象拉成**一串**字符"；`De` = 反向
+- 💡 模型：搬家**拆开装箱**（序列化）→ 到新家**拆箱组装**（反序列化）
+- ⭐ **`<T>` 填的是"整个 JSON 对应什么类型"**：JSON 顶层是数组 ⇒ 填 `List<LevelData>`（不是元素类型）
+- ⭐ **匹配机制 = 按名字**：JSON 键 `"Id"` ↔ 属性 `Id`
+
+⚠️ **两个静默坑（不报错，只是悄悄给默认值）**：
+
+| 坑 | 后果 |
+|---|---|
+| 默认**只认 public 属性**（不认字段） | 写成 public 字段 → 全是默认值 |
+| 默认**区分大小写** | JSON 的 `"id"` 配不上属性 `Id` |
+
+⇒ 所以"读完**打印出来看**"是唯一能抓住它们的动作。
+（同类对照：Newtonsoft.Json `JsonConvert.DeserializeObject<T>` 容错更宽；**Unity 自带 `JsonUtility` 限制多**——不支持 `Dictionary`、不支持顶层数组、只认 public 字段 / `[SerializeField]`。）
+
+### 六、本课涉及的异常（接谁、为什么）
+
+| 异常 | 什么时候 |
+|---|---|
+| `FileNotFoundException` | 文件不存在（消息里带**绝对路径**） |
+| `DirectoryNotFoundException` | 目录不存在 |
+| `IOException` | 被占用 / 磁盘问题（"文件在、但读不了"） |
+| `UnauthorizedAccessException` | 权限不够 |
+| `JsonException` | 文本不是合法 JSON / 结构对不上 |
+| **`InvalidDataException`**（`System.IO`） | ⭐ **"内容不符合预期"** —— 本课用它兜"解析出 null" |
+
+### 七、⭐ 可复用配方：读一张配置表（成品）
+
+```csharp
+// 抛型
+string json = File.ReadAllText(path);                                          // ① 磁盘 → 字符串
+List<LevelData>? levels = JsonSerializer.Deserialize<List<LevelData>>(json);   // ② 字符串 → 对象
+return levels ?? throw new InvalidDataException($"解析出来是 null，不是合法的关卡表：{path}");
+```
+
+- 三步 ⇒ **必须块体**（`=>` 放不下多语句）
+- ⭐ `?? throw` 一行完成"判 null + 抛"（见第 44 章第四节）
+- Try 版：接住上面那几类异常 + `out null`，返回 `bool`
+
+### 八、📌 待搬进 Unity 时的差异（指针，真搬时再补细节）
+
+| 数据类型 | Unity 里放哪 | 为什么 |
+|---|---|---|
+| **配置表**（只读、随包发布） | `Assets/` 里的资产（`TextAsset` / ScriptableObject）或 `StreamingAssets/` | 要**打进包** |
+| **存档**（运行时要写） | **`Application.persistentDataPath`** | 唯一**可写**且跨平台安全的目录 |
+
+⚠️ `Application.dataPath` **别用来存东西**（打包后变成 `xxx_Data/`）；⚠️ `StreamingAssets` 在 **Android / iOS** 上位于压缩包内，**`File` 读不了**（要 `UnityWebRequest`）。
+
+---
+
+## 44. null 三兄弟（`?.` / `??` / `??=`）+ `throw` 是表达式（10-08）
+
+### 一、三兄弟对照
+
+| 写法 | 名字 | 意思 |
+|---|---|---|
+| `a?.B` | **null 条件运算符**（空传播） | a 不是 null 才访问 `B`，否则整个表达式是 null |
+| `a ?? b` | **null 合并** | a 不是 null 用 a，是 null 用 b |
+| `a ??= b` | **null 合并赋值**（C# 8） | a 是 null **才**把 b 赋给它 |
+
+⭐ 你早就在用老大：`Goal.cs` 里 `GameManager.Instance?.NotifyPlayerWon();` —— 意思是"**裁判不在场就别喊**"。
+⭐ 短路特性：`a ?? b` 先算 a，a 非 null 就**不算 b**。
+
+### 二、⚠️ `??` 只认 null，**不认「空」**
+
+| 左边是 | 会兜底吗 |
+|---|---|
+| `null` | ✅ 兜 |
+| 空列表（`Count == 0`） | ❌ **不兜** |
+| 空字符串 `""` | ❌ 不兜 |
+
+⇒ 想兜"空集合"得自己写：`levels is null || levels.Count == 0 ? 默认 : levels`
+⭐ 判据：**"null" 和 "空" 是两件事** —— 与第 40 章「值域含 0 时不能用 0 当哨兵」**同一族**：别让"看起来空"的东西混进正常值域。
+
+### 三、`??` 为什么比三元 `?:` 好（当左边是方法调用时）
+
+```csharp
+GetLevels() ?? 兜底                             // 左边只求值【一次】
+GetLevels() == null ? 兜底 : GetLevels()        // ⛔ 调了【两次】（性能 + 副作用）
+```
+
+### 四、⭐⭐ `throw` 是【表达式】—— 所以它有两个"落脚点"
+
+C# 7 起 `throw` 可以作为**表达式**出现（它是那个"**长得像语句、其实是表达式**"的特例）：
+
+| 落脚点 | 例子 | 效果 |
+|---|---|---|
+| `??` 右边 | `return x ?? throw new InvalidDataException("…");` | 一行完成"判 null + 抛" |
+| `=>` 右边 | `public int F() => throw new NotImplementedException();` | 表达式主体方法也能"永不返回" |
+
+⭐ 对照记忆：**`foreach` / `if` / `return` / 赋值语句都进不了 `=>`**（它们是**语句**，没有值）；
+**`throw` 能进**（它是表达式）—— 这就是为什么"骨架里放 `=> throw`"能编译，"往里填多步逻辑"就必须换成块体。
+
+### 五、一个"一眼判形态"的判据
+
+> **数一数要写几条【分号语句】**：
+> - **1 条**且是纯表达式 → 用 `=> …`
+> - **≥ 2 条** → 必须 `{ }` 块体
+
+（`=>` 后面要的是【有值】的东西；`return` / `if` / `foreach` / 赋值都是"下命令"，没有值。）
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`101` 的 DFS（`Stack`）迭代版（10-05 记）**：现在写的是**队列成对版** → 用 `Stack<TreeNode?>` 再写一版，对照"队 vs 栈"哪种更自然（收敛到第 36 章那套"推进机制 vs 模拟调用栈"）
@@ -1563,3 +1956,6 @@ public static bool Approximately(float a, float b)
 - [ ] **`226` 的显式栈迭代版（10-03 记）**：只写了 **BFS 队列版**（判题器已加"两版互证"列）→ 显式栈版留作"**推进机制 vs 模拟调用栈**"的再一次对照。⚠️ `144` / `94` / `145` / `104` 那一批已于 **10-04 完成**，`226` 不在其中 → **留待后续**（顺手可复用 226 已有的"翻两次 = 还原"对合性检查）
 - [ ] **`104` 的两种"答案存放处"对照（10-04 记）**：现在用 `Dictionary<TreeNode,int>` 存每个节点的答案；改成"**让栈元素自带深度**（`(节点, stage, 深度)`）"能不能省掉字典？改一版跑通后对比**空间 / 可读性 / 常数**（承本册第 36 章第六节"显式栈不省内存"）
 - [ ] **图的 DFS 迭代版（10-04 记）**：同一招搬到图上 —— "栈元素带进度" vs "借 `visited` 容器"；`visited` 正好相当于显式栈版的"答案格子"，可用来回收第 36 章那套判据（学到图 / 树的高级遍历时回来）
+- [ ] **给自己写的类补"三件套"（10-08 记）**：写个小类重写 `Equals(object)` + `GetHashCode()` + 静态 `Equals(object, object)` → 放进 `HashSet` / 当 `Dictionary` 的 key，对照"**不重写时，两个内容相同的对象会被当成两个 key**"；顺带观察 `record` 的自动实现（承第 40 章第三 / 七节，连回第 23 章哈希表）
+- [ ] **`List<T>.Sort()` 为什么不需要约束？（10-08 记）**：它内部走 `Comparer<T>.Default` —— 把"能不能比较"的检查**推迟到运行期**（不满足就抛 `InvalidOperationException`）⇒ 与"编译期约束"形成对照；10-09 学 LINQ 后顺手回收 `Max()` / `OrderBy` 那一批（承第 41 章第三 / 四节、第 42 章第二 / 三节）
+- [ ] **把 JSON 配置表搬进 Unity（10-08 记）**：对照三条路径 —— **配置表**进 `Assets/`（`TextAsset` / ScriptableObject）或 `StreamingAssets/`、**存档**进 `Application.persistentDataPath`；顺手验 `JsonUtility` 的三个限制（不支持 `Dictionary` / 不支持顶层数组 / 只认 public 字段与 `[SerializeField]`）；⚠️ `StreamingAssets` 在 Android / iOS 上 `File` 读不了（承第 43 章第八节）
