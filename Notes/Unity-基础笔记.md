@@ -2541,11 +2541,102 @@ Breakout 的触屏「按住」按钮（**第 15 章**）实现的是 `IPointerDo
 
 ---
 
+## 23. 多关卡落地：场景改名 / 程序化生成 / 相机自动跟随（10-08 · Block 3 第 12 天）
+
+### 一、⭐ 派生数据不该手填（本章最值钱的一条）
+
+- **现象**：做第二关时用"复制场景"，结果相机**走到一半就卡住**，后半段地图永远在画外，**而且一声不响**
+- **病因**：`CameraFollow` 上的 `minX / maxX / fixedY` 是**按第一关的宽度手算出来的常量** —— 复制场景时它们被一起带走，而新关卡已经延展到 x=44
+- ⭐ **判据**：**"这个数是别人算出来的，还是它自己本来就是设定？"**
+  - 关卡宽度 → **关卡的属性**（自己就是设定）
+  - 相机夹取范围 → **派生的**（= 关卡边界 ± 视野半宽）
+- ⇒ **派生数据不要存，要算**。存了就变成"两份真相"，早晚不同步，而且**不同步时不报错**
+- ⭐ 引申：连"关卡边界"本身也不必手抄进配置文件 —— 它**已经存在于 Tilemap 里**了（砖块的包围盒）。再抄一份到 `levels.json` 只是**又多一个会漂的地方**
+
+### 二、Tilemap 的坐标账（今天两次算错的地方）
+
+| 量 | 值 / 规则 |
+|---|---|
+| Tile 的锚点 | **(0.5, 0.5)** ⇒ 砖块**以格子坐标为中心** ⇒ 台面**顶边 = 格子 y + 0.5** |
+| `Tilemap` 自身的 `localPosition` | **y = -0.2**（场景里调过），x = 0 |
+| ⇒ 某排砖的世界顶边 | **`CellToWorld(格坐标).y + 0.5`**（`CellToWorld` 已含 Tilemap 的偏移） |
+
+- ⚠️ **写"站在台面上"的 y 时，锚点和 Tilemap 偏移两个都要算** —— 今天敌人 / 终点"看起来陷进地里"两次都差这 0.5
+- ⭐ **可验证判据**：先 `Debug.Log` 打印 `cellBounds` 与 `localBounds` **对照**，再写落点
+  - `cellBounds` = **格子坐标**（整数、不含偏移）
+  - `localBounds` = **局部空间的连续包围盒**（已含砖块边缘）
+  - 二者形状一样、单位不同 —— 混用必错
+
+### 三、⭐ 场景改名：`MoveAsset` 与 git 的 `R`
+
+- 用 `AssetDatabase.MoveAsset("Assets/Scenes/SampleScene.unity", "Assets/Scenes/Level1.unity")`
+- ⭐ **GUID 保留** ⇒ 场景内所有引用不断、`Build Settings` 里的路径**自动更新**（不必手改）
+- ⭐ **落盘判据（很漂亮）**：`git status` 显示 **`R  SampleScene.unity -> Level1.unity`** —— 意思是 git 比对内容后认定「**同一个文件换了名字，内容一个字节都没变**」⇒ **证明"改名"没伤到文件**
+- ⭐ 佐证：文件大小与行数与原名完全一致（195,543 字节 / 6432 行）
+- ⚠️ 名字约定统一成 `Level1 / Level2` 后，`levels.json` 里的 `SceneName` **必须逐字同步**（它必须与 Build Settings 里注册的名字一致，否则 `LoadScene` 失败）
+
+### 四、⭐ 程序化生成地形：把关卡变成"一张表"
+
+```csharp
+tm.ClearAllTiles();
+int[,] segs = { {-14,-7,-3}, {-3,4,-3}, {5,8,-1}, … };   // {起 x, 止 x, 顶层 y}
+for (…) for (int x = segs[i,0]; x <= segs[i,1]; x++) tm.SetTile(new Vector3Int(x, segs[i,2], 0), tile);
+```
+
+- ⭐ 收益：**关卡设计变成一张可读的表** —— 改设计 = 改数字重刷，不必一个个拖
+- ⭐ 配套：敌人 / 金币也按**坐标表**批量实例化（`PrefabUtility.InstantiatePrefab` + `SetParent(parent, false)` + `localPosition`）
+- ⚠️ 父节点（`Coins` / `Enemys`）自带偏移 ⇒ 先把父节点**归零**，之后子物体坐标 = 世界坐标，算起来直观
+- ⭐ `Tilemap.GetUsedTilesCount()` 数的是**用了多少【种】瓦片资产**，不是**多少个格子** —— 想数格子要遍历 `cellBounds.allPositionsWithin` + `GetTile(p) != null`
+
+### 五、相机跟随的自动版（统一判据）
+
+```csharp
+float halfH = _cam.orthographicSize;          // 半高
+float halfW = halfH * _cam.aspect;            // 半宽（⭐ 每帧算：窗口一拉 aspect 就变）
+// 边界：localBounds 是局部空间 ⇒ 用 Tilemap 自己的 transform 转世界
+left/right/bottom/top = lt.TransformPoint(…).x/y;
+
+if (right - left > halfW * 2f) _goal.x = Mathf.Clamp(target.x + look, left + halfW, right - halfW);
+else                           _goal.x = (left + right) * 0.5f;   // ⭐ 装得下 ⇒ 居中
+if (top - bottom > halfH * 2f) _goal.y = Mathf.Clamp(target.y + yBias, bottom + halfH, top - halfH);
+else                           _goal.y = fixedY;
+```
+
+- ⭐⭐ **统一判据（x / y 同一套）**：「关卡在某个方向上**装不进**视野 ⇒ 跟随 + 夹取；**装得下** ⇒ 固定」
+  - 这其实是你 10-07 就写在注释里的那句话（"关卡高 15 < 视野高 16，上下不用跟"）—— 今天只是**把"人每次手算"改成"代码自己算"**
+- ⚠️ **装得下时【不能硬夹】**：`Clamp(value, min, max)` 在 `min > max` 时**不会崩**，但会**一直返回 min**（画面贴在左边）⇒ 必须走"居中"分支
+- ⭐ `levelBounds` 槽留空时**自动找**场景里唯一的 Tilemap（`FindFirstObjectByType<Tilemap>()`），找不到才退回手填的 `minX/maxX`
+
+### 六、构图与手感（查证过的四个参数）
+
+| 参数 | 实现 | 依据 |
+|---|---|---|
+| **角色偏下** | `yBias = 2` 格（相机比角色**高**）⇒ 角色在屏幕 ≈37.5% | Cinemachine 官方 `Screen Y`：**0=底 1=顶**，官方示范 **0.4**；平台游戏惯例：跳跃类偏下 **8%~12%**、攀爬类 **15%~25%**，⚠️ 上限 25%（再多看不到脚下） |
+| **阻尼** | `Vector3.SmoothDamp(pos, goal, ref _velocity, smoothTime)` | 官方 `Lookahead Ignore Y` 那条注明"2D 侧视常用，**避免跳跃时上下颠簸**"⇒ 纵向跟随时阻尼是**必需品** |
+| **死区** | 目标离相机 < `deadZone` ⇒ 吸附（画面彻底静止） | 官方原话：**Dead Zone 决定"什么时候开始动"**，Soft Zone 决定"从多远开始动"，Damping 决定"动多快" |
+| **前瞻** | 按 `linearVelocity.x` 朝运动方向偏移，满速最多 `lookAheadX` 格 | 平台游戏通行做法：向右跑时多看右边，玩家才有反应时间 |
+
+- ⭐ **方向别搞反**：**"角色偏下" = 相机比角色【高】**。反过来说，"角色偏下"和"底部留白"**是同一件事的两面** —— 不能同时任意指定两个
+- ⭐ `SmoothDamp` 用 `Time.deltaTime` ⇒ 游戏结束时 `timeScale = 0`，相机会**一起冻结**（正好是我们想要的）
+- ⚠️ 开场第一帧要**直接吸附**（`_goal` 用当前位置初始化 + 首帧直接赋值），否则会从旧位置"滑过来"
+
+### 七、⭐ 断言习惯（用工具批量操作编辑器时）
+
+- ⚠️ **"API 返回成功" ≠ "状态真的变了"**：加载场景的调用回了"成功"，但**活动场景其实没换** —— 于是后续每一步写入都落在**别的对象**上
+- ⭐ **判据：任何关键写入之前，先加一句独立断言**
+  ```csharp
+  if (GetActiveScene().name != "Level2") return "ABORT: 我现在改的不是目标场景";
+  ```
+  断言不是形式主义，它是把「**我以为**」换成「**我知道**」的唯一手段
+- ⚠️ 用"在编辑器里跑代码"的工具时：内容是**方法体** ⇒ 不能声明方法；老编译器（CodeDom）**不支持 C# 7+ 的局部函数** ⇒ 用 lambda 代替
+- ⚠️ **"桥活着" ≠ "本会话能用上"**：MCP 服务器列表在**会话启动时读一次** ⇒ 端口在听、Unity 侧也开着，会话里仍可能看不到工具 ⇒ 重启会话才可见
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
-- [ ] **`CameraFollow` 的 `minX` / `maxX` 改成「运行时算」（10-07 记 · ⏰ 排 10-10 打磨日）**：现在按 **16:9 写死**，但它们其实是**屏幕宽度的函数**（`halfWidth = orthographicSize × aspect`）—— 分辨率一变，"屏幕外沿 = 关卡边界"就不成立 ⇒ 会退化成"**在关卡里就死**"或"**出了关卡还不死**"。改法 = `Awake` / `Start` 里用 `Camera.aspect` 算一次（或在 `OnValidate` 刷新）
-- [ ] **`Goal` 借 `Hazard` 层语义不搭（10-07 记）**：终点不是"危险物"，只是那个层**正好空着**才借用。等真要加**尖刺 / 陷阱**时**一次性规划层**（⚠️ 加层或改名会动 `ProjectSettings` → 走"保存项目 + 隐私自查 + 提交设置"）
-- [ ] **相机 Y 跟随 + 死区（10-07 记）**：现在只跟 x（因为关卡高 15 < 视野高 16）。一旦关卡**变高**到一屏装不下、需要 Y 跟随，**必须配死区（dead zone）** —— 否则跳跃时相机会跟着上下抽动
+- [x] ~~**`CameraFollow` 的 `minX` / `maxX` 改成「运行时算」**~~（**10-08 提前完成 ✓**）：实际做得比原计划更彻底 —— 不是"运行时算一次"，而是**从 `Tilemap.localBounds` 自己量关卡边界**（连"关卡多大"都不用手填）；`halfWidth = orthographicSize × aspect` **每帧算** ⇒ 窗口比例一变自动跟上。⚠️ 顺带钉死一条：**装得下时不能硬夹**（`Clamp` 下界 > 上界会一直返回 min、画面贴左）⇒ 走"居中"分支
+- [x] ~~**相机 Y 跟随 + 死区**~~（**10-08 提前完成 ✓**）：判据落成「**关卡在某方向装不进视野 ⇒ 跟随 + 夹取；装得下 ⇒ 固定**」，x / y **同一套代码**；另配 `SmoothDamp` 阻尼 + 死区 + `yBias` 偏下 2 格（依据官方 Cinemachine `Screen Y` 示范 0.4 与平台游戏惯例）⇒ 🏯 **待第三关（爬塔）实战验证**
 
 - [ ] **`Run` 动画周期与角色速度同步（10-05 记）**：`PlayerRun.anim` 固定 0.2s 一拍，与 `moveSpeed` 无关 → 调 State 的「速度」乘数或 `animator.speed`（`= 实际速度 / 基准速度`）；再学 **Blend Tree** 做"速度混合"
 - [ ] **视野只探一条水平线（10-05 记）**：`Physics2D.Raycast` 从身体中心水平发 → 玩家跳高就"看不见" → 加斜向射线或 `OverlapCircle` 视野（做"追逐 / 攻击"时一起）
