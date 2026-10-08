@@ -122,6 +122,19 @@ public class GameManager : MonoBehaviour
     //       该崩的是"配置坏了 / 当前关在表里找不到"（那是数据问题）
     public void LoadNextLevel()
     {
-        throw new NotImplementedException("TODO B：找下一关 → 还 timeScale → LoadScene");
+        int i =_levels.FindIndex(level => level.SceneName == SceneManager.GetActiveScene().name);
+        if(i == -1)
+        {
+            Debug.LogError("[GameManager] 当前关在关卡表里找不到：点「下一关」会失败", this);
+            return;
+        }
+        int nextIndex = i + 1;
+        if(nextIndex >= _levels.Count)
+        {
+            Debug.Log("[GameManager] 已经是最后一关：点「下一关」不会有反应", this);
+            return;
+        }
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(_levels[nextIndex].SceneName);
     }
 }

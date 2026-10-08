@@ -2,9 +2,8 @@
 // ⭐ 顶层是【数组】—— Newtonsoft 直接吃；Unity 自带的 JsonUtility 不支持顶层数组（这也是选 Newtonsoft 的理由之一）
 // ⚠️ 这里的 "//" 注释只有【宽容的解析器】才允许（Newtonsoft 默认允许；System.Text.Json 会报错）
 // ⚠️ SceneName 必须与 Build Settings 里注册的场景名【逐字一致】
-//    现在只有 SampleScene 一个场景 ⇒ 关 2 / 关 3 的场景要等 10-10 建好并注册后才能真正加载
+//    10-08 起场景统一命名为 Level1 / Level2（原 SampleScene 已改名为 Level1）
 [
-  { "Id": 1, "Name": "草地关", "SceneName": "SampleScene" },
-  { "Id": 2, "Name": "深渊关", "SceneName": "Level2" },
-  { "Id": 3, "Name": "高塔关", "SceneName": "Level3" }
+  { "Id": 1, "Name": "草地关", "SceneName": "Level1" },
+  { "Id": 2, "Name": "深渊关", "SceneName": "Level2" }
 ]
