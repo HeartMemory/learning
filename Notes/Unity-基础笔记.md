@@ -2770,7 +2770,116 @@ EditorApplication.QueuePlayerLoopUpdate();  Physics2D.SyncTransforms();
 
 ---
 
-## 📌 回访清单（学到对应内容时回来重构）
+## 25. 音频系统全链条：素材 → 导入 → 混音 → 播放 → 结束即停（10-10 · 第 7 号成品）
+
+> 今天从"工程一点声音都没有"做到"三个关卡全有声"。本章按**一条数据流**排：素材从哪来 → 怎么进工程 → 走哪条总线 → 谁在什么时候播 → 结束时怎么停。
+
+### 一、素材：先查证站点还活着，再谈许可
+
+- ⚠️ **网上教程会推荐已经关掉的站**：`freepd.com`（被大量"免费 CC0 音乐"文章推荐）**已经关站** —— 页面标题就是 `FreePD.com - Site Closed`，访问子路径返回 **404**。教训：**搜索结果里的旧描述 ≠ 站点现状**，要**真去访问一次**。
+- ✅ **实际可用**：**OpenGameArt.org**（直链下载、许可标注清楚）。本次取到 **CC0** 音乐 5 首 + 音效 13 个。
+- ⭐ **许可优先级（公开仓库场景）**：**CC0 / 公共领域 > CC-BY（要署名）> CC-BY-SA / GPL（传染性）**。
+  - 判据：**公开仓库里挂第三方署名不划算** ⇒ 优先 CC0；CC-BY-SA / GPL **直接不碰**。
+  - 本次**排除**了 `win-sound-1/2`（CC-BY-SA 3.0 / GPL 3.0）、`8-bit-platformer-sfx` 与 `footsteps`（CC-BY 3.0）、`foot-walking-step-sounds…`（GPL 3.0）。
+- 📌 **留一份来源记录**（来源站 / 作者 / 许可 / 抓取日期 / **排除理由**）—— 素材脱离了记录，半年后就没人知道它能不能商用了。
+
+### 二、导入设置：音频有**两种读法**，按用途选
+
+| 读法 | Inspector 里 | 特点 | 谁用 |
+|---|---|---|---|
+| **进内存** | `Load Type = Decompress On Load` | 播放**零延迟**，但整段占内存 | **音效**（短、一秒可能响好几次） |
+| **边播边读** | `Load Type = Streaming` | **省内存**，有解码 / 磁盘开销 | **BGM**（几分钟、只 1 个实例） |
+
+- 落地：BGM `Streaming` + `Preload Audio Data` 取消；音效 `Decompress On Load` + 预加载勾上。
+- 🔍 **验证手法（别凭感觉）**：读回 `.meta` 看 `loadType`（`0` = Decompress On Load / `1` = Compressed In Memory / `2` = Streaming）与 `preloadAudioData`。
+- ⭐ 多选文件一起改：Inspector 顶部显示 **"多个文件"**，改了 `Apply` **一次应用到全部**。
+
+### 三、`AudioMixer`：一张调音台，三层结构
+
+| 层 | 是什么 | 生活模型 |
+|---|---|---|
+| `AudioMixer` | 整个资产 = **一台调音台** | 调音台 |
+| `AudioMixerGroup` | 台子上的**几路推子**（本工程 `Music` / `Sfx`） | 推子 |
+| `AudioSource.outputAudioMixerGroup`（**`输出`**） | 这根线**插在哪路推子上** | 线 |
+
+- 建法：「项目」窗口右键 → 「创建」→「音频混音器」→ 双击打开面板 → **先选中 `Master`** 再点 `Groups` 区的 **`+`**（⭐ **选中谁，`+` 就建在谁下面**）→ 改成 `Music` / `Sfx`。
+- ⭐⭐ **判据：音量这个属性只能有一个写入者。** 音量交给 Mixer 管之后，所有 `AudioSource.Volume` **一律保持 `1`** —— 否则"音量"有两个主人，将来做设置界面必打架。
+- ⭐ **Mixer 的改动会写进 `.mixer` 资产**（读盘能看到组名）；确认落盘后**不必**点「文件 → 保存项目」（少一次 `ProjectSettings.asset` 被写回的风险）。
+- ⚠️ 别把 `Spatial Blend`（**空间混合**，2D↔3D）和 `Stereo Pan`（**立体声像**，左右）搞混；`空间混合 = 0`（纯 2D）时，底下一整块 `3D Sound Settings` **全部失效**，不用管。
+  - 📌 Unity 内部把 `空间混合` 存成一条**恒定曲线** `panLevelCustomCurve` ⇒ YAML 里**找不到** `SpatialBlend` 这个字段名（grep 会误判）。
+
+### 四、播放策略三分法（今天最值钱的一张表）
+
+| 音 | 怎么做 | 为什么 |
+|---|---|---|
+| **BGM** | `Loop` + `PlayOnAwake` —— **免脚本** | 场景一加载它自己就播，不需要任何代码 |
+| **跳 / 落地** | 挂在 `PlayerController` **已有的两个分支**上（起跳分支 / 接地上升沿） | ⭐ **天然每件事只响一次** ⇒ 不需要计时器、不需要去重、不可能"每帧播" |
+| **走路** | **节拍式**：计时器把"持续在走"切成"每隔 `stepInterval` 踩一次" | ⭐ 判据 **"踩地是事件，不是状态"** |
+
+- ⛔ **走路音的反面（09-26 血泪的直系亲属）**：`if (在走) PlayOneShot(step)` = **每物理步播一次** = 一秒 50 次叠加 → **削波刺耳**。
+- ⭐ 节拍式两个关键细节：
+  - **不在走要「归零」** ⇒ 下次起步的第一声**立刻**响，而不是等完上一轮剩下的间隔（否则起步有个随机长度的静音空档）。
+  - **到点「重置为满」**，不是 `+= stepInterval`（后者会把每帧余量累积成漂移）。
+- ⚠️ 计时用 `Time.fixedDeltaTime`（方法跑在物理时钟里），不是 `deltaTime`。
+- ⭐ `Random.Range(int, int)` 是**左闭右开** ⇒ 上限传 `Length`（传 `Length - 1` 则**最后一个永远抽不到**）；⚠️ 同名重载 `Random.Range(float, float)` 却是**闭区间** —— 同名不同规矩。
+- ⭐ 两个同类取法（跳音 / 走路音）**抽成一个 `PlayRandom(AudioClip[])`**：空阵列守卫只有一处，就不可能漏。
+
+### 五、`timeScale` 的影响力半径 · **另一面**
+
+- `GameManager` 结束游戏时会 `Time.timeScale = 0f` —— 那**只冻物理**。
+- ⭐ **`AudioSource` 跑在实时时钟上，根本不吃 `timeScale`**（与 `Animator` 默认**吃**正好相反）⇒ 世界冻结时 **BGM 会一直播下去**。
+- ⇒ 判据：**"世界冻结"这个动作，不会替你把声音停了** —— 每个想跟着停的东西都得**自己订阅"结束"**。
+- 💡 反面也是同一条：结算音该响的时候，`timeScale = 0` **也冻不住它**（`PlayOneShot` 照响）。
+
+### 六、订阅的判据（`SceneAudio`：一个脚本管"停 BGM"+"播结算音"）
+
+- ⭐ **"停 BGM" 订 `OnGameEnded`** —— 与**怎么结束**无关（承第 21 章：订阅端该订**语义**，不是某一个具体原因）。
+- ⭐ **"播哪个结算音" 订 `OnGameOver` / `OnGameWin`** —— 这里**必须**区分具体原因。
+- ⇒ 同一份代码里两种订阅并存，正好把那条判据的**两面**各演一遍。
+- ⭐ **预制体不能引用场景对象** ⇒ 挂在 Prefab 上的脚本**拿不到**场景里的 `GameManager` ⇒ **只能用单例 `GameManager.Instance`**（与第 19 章敌人"预制体拖不了裁判引用"完全同构）。
+- ⭐ **订阅放 `Start`，不放 `OnEnable`**：`Awake` / `OnEnable` 的**跨对象顺序不确定** ⇒ 那时 `Instance` 可能还是 `null`；`Start` 在**所有 `Awake` 跑完之后**。
+- **退订用 `OnDestroy`**（场景物体是"被销毁"，不是"被禁用"）；静态事件不退订 = 悬挂引用（承第 20 章的静态账）。
+
+### 七、⚠️ 同一个物体上两个同类组件 = 一个静默陷阱
+
+- `GetComponent<AudioSource>()` 返回**哪一个是不确定的**（取决于添加 / 序列化顺序）。
+- 更坑的是 **Inspector 的组件引用标签格式是 `<物体名> (<类型名>)`** ⇒ 两个都显示 `BGM (Audio Source)`，**肉眼分不出**。
+- ⇒ 两条做法：
+  1. **两个引用都显式拖**，且**从「检查器」拖组件标题条** —— **不要从「层级」拖物体**（拖物体时选哪个同类组件**未定义**）。
+  2. ⭐ 根治 = **让它们各有各的家**：把第二个 `AudioSource` 挪到**子物体**上（`BGM` / `Stinger`）⇒ 标签立刻可辨、`GetComponent` 也能放心用。
+- ⭐ 判据：**"平局不可靠"** —— 承第 19 章 `Order in Layer` 的平局实测：**凡是系统明说结果未定义的地方，就别让它替你做决定；要靠结构消歧，不要靠"操作时小心"。**
+
+### 八、⭐ 覆盖多关卡：Prefab 与非 Prefab 的差别（"换关没声"的根因）
+
+- 现象：Level3 有声，切到 Level1 / Level2 **只有 BGM、没有跳跃 / 走路音**。
+- 诊断（**读盘，不猜**）：`PlayerAudio` 脚本在三个场景的引用数是 **1 / 0 / 0**。
+- 根因：**`BGM` 是 Prefab（三关共用模具）⇒ 一次改动三关生效；`PlayerAudio` 不是** —— `Player` 是三关各一个的**独立物体**，改动只落在你挂的那一个上。
+- ⭐⭐ 判据：**"三个场景要一模一样的东西，就该是 Prefab"**。不是 Prefab 的，每加一处改动就得**重复三次**，**漏一次就出现"换关掉音"**。
+- 处置：当晚先**补齐两关**（零风险）；**把 `Player` 提成 Prefab 记入待办** —— ⚠️ 但有个硬阻碍：`PlayerController.gameManager` 是**场景引用**，**Prefab 存不了** ⇒ 提成 Prefab 后**三关各要重拖一次**（`groundCheck` / `visual` / `animator` 那些是 Prefab **内部**引用，能存）。
+- 📌 顺手一条：**改 Prefab 之后，三个场景文件都会显示为"已修改"** —— 这不是异常，正是"改动传播到所有实例"的可见证据。
+
+### 九、工程纪律（本次实测）
+
+1. ⭐ **编译判据 = 比对时间戳**：`Library/ScriptAssemblies/Assembly-CSharp.dll` **新于**源码 ⇒ 已编译。⚠️ **Unity 未聚焦（`is_focused: false`）时不自动重编译** —— 光靠外部工具"刷新"推不动它（`compile_started: false`），要么点一下编辑器窗口，要么用编辑器内的编译 API。
+2. ⚠️ **`.meta` 也要确认"文件夹自己那一份"**：`.../Sfx/Win.meta` 与 `Sfx/Lose.meta` **躺在父目录 `Sfx\` 里**（本册第 17 章那条老坑的又一次现身）。
+3. ⚠️ **控制台噪声要会归因**：反复出现的 `MCP-FOR-UNITY [WebSocket] …` 是**编辑器桥插件自己**发的，**与工程无关**；另有几条 `minVolume / maxVolume / rolloffFactor is not supported anymore` 是**读组件属性**触发的**废弃字段提示**，也不是场景问题。
+4. ⭐ **"同名同类"要靠结构消歧**（见第七节）；**"三关一致"要靠 Prefab**（见第八节）—— 今天两条都撞上了。
+
+### 十、本次落地清单
+
+| 资产 / 脚本 | 内容 |
+|---|---|
+| `Assets/Audio/PlatformerMixer.mixer` | 调音台，两路分组 `Music` / `Sfx` |
+| `Assets/Audio/Music/` | 5 首 CC0 BGM（`Streaming`） |
+| `Assets/Audio/Sfx/{Jump,Land,Step,Win,Lose}/` | 13 个 CC0 音效（`Decompress On Load`） |
+| `Assets/Prefabs/BGM.prefab` | **两个 `AudioSource`**（BGM：`Music` + `loop` + `PlayOnAwake`；结算：`Sfx` + 空 clip）+ `SceneAudio` |
+| `Assets/Scripts/PlayerAudio.cs` | 跳 / 落地（订 `PlayerController` 事件）+ 走路（节拍计时器） |
+| `Assets/Scripts/SceneAudio.cs` | 订 `OnGameEnded` 停 BGM；订 `OnGameOver` / `OnGameWin` 播结算音 |
+| `PlayerController.cs` | **只加接线**：两个 `event`（`OnJumped` / `OnLanded`）+ 两个只读成员（`IsGrounded` / `MoveAxis`）+ `_wasGrounded` 初值改 `true`（出生不算"落地"） |
+
+> ⭐ 一句话总结今天：**"谁产生的谁消费" + "要区分原因的订原因、不区分原因的订语义"** —— 这两条判据把"什么时候播、播哪个、结束怎么停"三件事全定完了。
+
+
 
 - [x] ~~**`CameraFollow` 的 `minX` / `maxX` 改成「运行时算」**~~（**10-08 提前完成 ✓**）：实际做得比原计划更彻底 —— 不是"运行时算一次"，而是**从 `Tilemap.localBounds` 自己量关卡边界**（连"关卡多大"都不用手填）；`halfWidth = orthographicSize × aspect` **每帧算** ⇒ 窗口比例一变自动跟上。⚠️ 顺带钉死一条：**装得下时不能硬夹**（`Clamp` 下界 > 上界会一直返回 min、画面贴左）⇒ 走"居中"分支
 - [x] ~~**相机 Y 跟随 + 死区**~~（**10-08 提前完成 ✓**）：判据落成「**关卡在某方向装不进视野 ⇒ 跟随 + 夹取；装得下 ⇒ 固定**」，x / y **同一套代码**；另配 `SmoothDamp` 阻尼 + 死区 + `yBias` 偏下 2 格（依据官方 Cinemachine `Screen Y` 示范 0.4 与平台游戏惯例）⇒ 🏯 **10-09 爬塔关实战已验证 ✓**（x 走"装得下 ⇒ 水平居中"、y 走"装不下 ⇒ 跟随 + 夹取"，两条分支都跑到了）
@@ -2825,7 +2934,7 @@ EditorApplication.QueuePlayerLoopUpdate();  Physics2D.SyncTransforms();
 - [ ] **"一对多"事件实战（09-29 记）**：`BallLost` 目前只有一个订阅者 → 找一次机会让同一次广播喂给**多个**订阅者（例如"漏球"同时触发 音效 + UI 文案 + 统计），亲身感受"发布者无感、订阅者各自处理"（可与 10-10 打磨日的音效/UI 分工合并做）
 - [ ] **通关音 vs 失败音（09-25 记）**：声音搬到 `End()`（唯一出口）后，**两条路径共用了同一个下滑音** → 通关也该有"上扬音"；解法是把签名改成 `End(string message, AudioClip sound)`：**通用动作留出口，各自数据由入口传参**
 - [ ] **音效变体铺开 + 音效池（09-25 记）**：现在只有撞砖做了 3 个音高变体 → 挡板/结算也做；再体会"同时发声上限"与"多个 `AudioSource` 轮询（voice pool）"
-- [ ] **音量统一管理（09-25 记）**：三处各自 `Volume = 1` → 引入 **`AudioMixer`** 做 `BGM` / `SFX` 分组与总音量（设置界面要用）
+- [x] ~~**音量统一管理（09-25 记）**~~（**10-10 销账 ✓**）：三处各自 `Volume = 1` → 引入 **`AudioMixer`** 做 `BGM` / `SFX` 分组与总音量（设置界面要用）⇒ **已落地**（第 25 章第三节）：`PlatformerMixer` 两条分组 `Music` / `Sfx`，所有 `AudioSource.Volume` 保持 `1`；判据收口为 **"音量这个属性只能有一个写入者"**。⏳ 剩下"设置界面用音量滑条"的部分**顺延**（要等主菜单/设置界面做出来）
 - [ ] **`.anim` / `.controller` 的 git 自查（09-25 记）**：今天新增了 `Assets/Animation/` 目录 → 提交时用**目录级** `git add`，确认 `.anim` / `.controller` 的 `.meta` 一起进（09-22 那条纪律，换了资产类型照样适用）
 - [ ] ⚠️ **Breakout 素材待更新（10-01 记）**：画面新增**触屏左右按钮**（`LeftButton` / `RightButton`，见本册第 15 章）→ **09-26 的录屏与 3 张截图已与工程不一致** → 待重录 **≤30 秒**录屏 + 3 张**带按钮**的截图（命名口径：`demos/breakout-demo.mp4` + `breakout-NN-<描述>.png`）
 - [ ] **土狼时间（coyote time）+ 跳跃输入缓冲（10-02 记）**：① **走离平台边缘后仍允许短暂起跳**（一般 0.1~0.15s）② **落地前就按了跳**，落地那一瞬自动执行 —— 两者都是"**给输入 / 传感器加时间容错**"，与第 16 章第八节"传感器跟不上那一瞬"同源。⭐ 实现要点：用**计时器**记"上次接地 / 上次按跳"的**时刻**，而不是用布尔 —— 布尔把"刚刚"和"很久以前"混为一谈。
