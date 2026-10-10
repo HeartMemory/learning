@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 // ══════════════════════════════════════════════════════════════
@@ -40,13 +41,27 @@ public class PlayerController : MonoBehaviour
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
     private static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
 
-
+    // ══════════════════════════════════════════════════════════════
+    //  🆕 10-10 对外只读状态 + 两个"事实"事件（消费者 = PlayerAudio）
+    //    判据：脚本只【报事实】，不替别人做决定（与"喂 Animator"那条同源）
+    //      · IsGrounded / MoveAxis = 【状态】—— 会持续，"正在走"要靠它
+    //      · OnJumped / OnLanded   = 【事件】—— 不可持续的事实，"跳了/落地了"靠它
+    //    ⭐ 关键红利：这两个事件挂在【已有分支】上 ⇒ 天然每件事只发生一次，
+    //      消费者（音效）**不用自己判重**，也不会"每帧播"。
+    // ══════════════════════════════════════════════════════════════
+    public event Action OnJumped;
+    public event Action OnLanded;
+    public bool IsGrounded { get; private set; }
+    public float MoveAxis => _axis;
 
     // ── 两个"跨时钟的桥"：Update 写、FixedUpdate 读 ──
     private float _axis;            // 电平语义：你【正推着】多少
     private int _jumpsLeft;         // 可消耗资源：起跳次数余额，落地回满
     private bool _jumpRequested;    // 边沿语义：这一帧【刚按下】
-    private bool _wasGrounded;      // 🆕 10-06：上一【物理步】的接地观测（边沿判据专用）
+    private bool _wasGrounded = true;  // 🆕 10-06 建 · 10-10 改初值为 true：
+                                       //   "落地"的定义是【从空中踩到地】，出生就站着不算
+                                       //   ⇒ 开局第一帧不会白响一声落地音
+                                       //   （不影响回满：Awake 里已经 _jumpsLeft = maxJumps）
 
 
 
@@ -171,7 +186,12 @@ public class PlayerController : MonoBehaviour
         //             离散状态用离散量记 —— 这里的离散量就是"上一步是否接地"
         //    ⭐ 顺带解决了原注释 ③ 想防的事：起跳后那一两步是"接地 → 接地"（true → true），
         //       不是上升沿 → 不回满 → 【不会白送次数】，再也不需要速度参与
-        if (isGrounded && !_wasGrounded) _jumpsLeft = maxJumps;
+        if (isGrounded && !_wasGrounded)
+        {
+            _jumpsLeft = maxJumps;
+            OnLanded?.Invoke();   // 🆕 10-10：只有"从空中踩到地"这一个上升沿会触发
+                                  //   ⇒ 落地音不需要任何去重逻辑，天然落一次响一次
+        }
 
         // ④ 一次决策：y 只有两个去处
         //    · 起跳：y = jumpSpeed（【覆盖】不是累加 —— 覆盖才能让高度只由 jumpSpeed 决定）
@@ -183,6 +203,8 @@ public class PlayerController : MonoBehaviour
         {
             y = jumpSpeed;
             _jumpsLeft--;
+            OnJumped?.Invoke();   // 🆕 10-10：跳跃音挂在这个分支里 ——
+                                  //   只有【真的跳了】才响；"按了但没跳"（次数耗尽）不会响
         }
 
         // ⑤ 消费掉意图：放在 if【外面】
@@ -202,6 +224,7 @@ public class PlayerController : MonoBehaviour
 
         // 🆕 10-06：记下这一步的接地观测 —— ⚠️ 必须【每步】都更新，
         //    否则它永远是 false → 每步都被当成上升沿 → 变成"每步无条件回满"（白送跳次）
+        IsGrounded = isGrounded;   // 🆕 10-10：对外只读状态（走路音读它判断"还在不在走"）
         _wasGrounded = isGrounded;
     }
     // ⭐ 真接触判定：物理上真的"踩在"某个面上
