@@ -44,29 +44,41 @@ static string Fmt(IEnumerable<IEnumerable<int>>? levels)
     return "[" + string.Join(", ", parts) + "]";
 }
 
+// 逐层逐元素比两个"层序结果"（互证用；期望值 `int[][]` 与结果 `IList<IList<int>>` 都能塞进来）
+static bool Same(IEnumerable<IEnumerable<int>>? x, IEnumerable<IEnumerable<int>>? y)
+{
+    if (x is null || y is null) return false;
+    List<IEnumerable<int>> a = x.ToList(), b = y.ToList();
+    if (a.Count != b.Count) return false;
+    for (int i = 0; i < a.Count; i++)
+        if (!a[i].SequenceEqual(b[i])) return false;
+    return true;
+}
+
 // 判题器：这次期望值是"列表的列表"（层序天然是二维），所以要逐层逐元素比
 static void Check(string title, int?[] input, int[][] expected)
 {
     TreeNode? root = Build(input);
     IList<IList<int>>? actual = new Solution().LevelOrder(root);
 
-    bool ok = actual is not null && actual.Count == expected.Length;
-    if (ok)
+    // 10-11 加：收官日【盲写重做】版 —— 与 10-01 那版**互证**（两版都绿才算过）
+    IList<IList<int>>? rewrite = null;
+    string rewriteTag = "⬜未实现";
+    try
     {
-        for (int i = 0; i < expected.Length && ok; i++)
-        {
-            if (actual![i] is null || actual[i].Count != expected[i].Length) { ok = false; break; }
-            for (int j = 0; j < expected[i].Length; j++)
-                if (actual[i][j] != expected[i][j]) { ok = false; break; }
-        }
+        rewrite = new Solution().LevelOrderRewrite(root);
+        rewriteTag = Same(rewrite, expected) ? "✅" : "❌";
     }
+    catch (NotImplementedException) { }
 
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}");
-    if (!ok)
+    bool ok = Same(actual, expected);
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔盲写重做：{rewriteTag}〕");
+    if (!ok || rewriteTag == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
         Console.WriteLine($"     期望：{Fmt(expected)}");
         Console.WriteLine($"     实际：{Fmt(actual)}");
+        if (rewriteTag == "❌") Console.WriteLine($"     盲写版：{Fmt(rewrite)}");
     }
 }
 
@@ -158,7 +170,7 @@ public class Solution {
     //      ⚠️ 算完再回答这一句：为什么递归版（144 讲过是 O(h)）和层序的答案**形状正好相反**？
     //
     //   ── 验收标准：
-    //      ① 15 组全绿（含空树、两条斜链、含 0/负数、三组反例）；
+    //      ① 15 组全绿（**两版互证**：10-01 版 + 下面的盲写重做版，含空树、两条斜链、含 0/负数、三组反例）；
     //      ② 反例区三组的含义能说出来（从右到左 / 压成一层 / 补空层）；
     //      ③ 能用一句话说清"为什么层序用队列、前中后序用递归（系统栈）"。
       public IList<IList<int>> LevelOrder(TreeNode? root)
@@ -181,5 +193,51 @@ public class Solution {
                   list.Add(ints);
             }
             return list;
+      }
+
+    // ══════════════════════════════════════════════════════════════
+    //  🔁 10-11 · 收官复盘日 · 盲写重做
+    //
+    //  背景：上面那版 `LevelOrder` 是 **10-01 当天边想边写** 出来的（其间踩过错误 21：
+    //        把"本层个数"写成活的 `q.Count`）⇒ 按同款规矩补一次
+    //        【不看旧代码、不看上面那段注释、不搜索，自己从零写】的版本。
+    //
+    //  ⛔ 盲写期间**不要往上翻** `LevelOrder`，也别翻笔记、别搜。
+    //  ✅ 只允许看：方法签名 + 下面这几条判据 + 判题器给的用例形状。
+    //
+    //  ── 判据（这次要自己推一遍，别回忆）：
+    //     · "这一层有几个"这件事，队列自己会说吗？—— 它只保证 FIFO，**不知道层的边界在哪**
+    //       ⇒ 边界只能由你自己**提前记一份账**
+    //     · 那份账要落在哪儿，才不会被 `while` 里的进出队**改掉**？
+    //     · 换到下一层时，上一层的账还用得上吗？（用不上 ⇒ 每层开头重新记一份）
+    //
+    //  ── 自查探针：官方示例 1 → `[[3],[9,20],[15,7]]` ｜ 空树 → `[]` ｜
+    //     满树三层 → 每层 1 / 2 / 4 个 ｜ 左斜链 `[1,2,null,3,null,4]` → `[[1],[2],[3],[4]]`
+    //     （前两组专抓"层被切碎"，最后一组专抓"空树返回 null / [[]]"）
+    //
+    //  ── 写完自己回答：
+    //     · 你写的那行"记账"如果删掉，输出会变成什么形状？（错误 21 就是删掉它的后果）
+    //     · 时间 / 空间各是多少？（空间**算两次**：一条斜链 vs 一棵满树）
+    // ══════════════════════════════════════════════════════════════
+      public IList<IList<int>> LevelOrderRewrite(TreeNode? root)
+      {
+            IList<IList<int>> ints = new List<IList<int>>();
+            if(root == null) return ints;
+            Queue<TreeNode> trees = new Queue<TreeNode>();
+            trees.Enqueue(root);
+            while(trees.Count > 0)
+            {
+                  int times = trees.Count;
+                  List<int> list = new List<int>();
+                  for(int i = 0;i < times;i++)
+                  {
+                        TreeNode node = trees.Dequeue();
+                        list.Add(node.val);
+                        if(node.left != null) trees.Enqueue(node.left);
+                        if(node.right != null) trees.Enqueue(node.right);
+                  }
+                  ints.Add(list);
+            }
+            return ints;
       }
 }

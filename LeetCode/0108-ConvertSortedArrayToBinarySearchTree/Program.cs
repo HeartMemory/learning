@@ -172,6 +172,21 @@ int MinPossibleHeight(int n)
     catch (NotImplementedException) { return (false, null, -1); }
 }
 
+// 10-11 加：收官日【盲写重做】版 —— 与 10-10 那版**互证**
+(bool ready, TreeNode? tree) TryBuildRewrite(int[] nums)
+{
+    try { return (true, new Solution().SortedArrayToBSTRewrite(nums)); }
+    catch (NotImplementedException) { return (false, null); }
+}
+
+// 两棵树是否【逐节点同值同形】（互证用）
+//   ⚠️ 本题答案不唯一 ⇒ "两版形状不同"**不一定**是错（只要两版各自过了性质裁判就行）⇒ 只打印、不计错
+bool SameTree(TreeNode? a, TreeNode? b)
+{
+    if (a is null || b is null) return a is null && b is null;
+    return a.val == b.val && SameTree(a.left, b.left) && SameTree(a.right, b.right);
+}
+
 // ────────────────────────── 用例表（唯一数据源） ──────────────────────────
 // ⚠️ 表里**没有**「期望树」这一列 —— 因为答案不唯一，写不出唯一期望（这就是今天的第一课）。
 //    每一组只提供**输入**，合格与否交给上面的性质裁判。
@@ -221,8 +236,19 @@ foreach (var c in cases)
     if (!r.ready) { Console.WriteLine($"⏳ {c.Title}  → Solution 尚未实现，跳过"); continue; }
 
     bool ok = CheckProperties(r.tree, c.Nums, out string why);
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {c.Title}");
-    if (!ok) Console.WriteLine($"     ⛔ {why}");
+
+    // 10-11 加：收官日【盲写重做】版 —— ① 自己也要过性质裁判 ② 与 10-10 版**互证形状**
+    var w = TryBuildRewrite(c.Nums);
+    bool okW = true;
+    string whyW = "", rewriteTag = "⬜未实现";
+    if (w.ready) { okW = CheckProperties(w.tree, c.Nums, out whyW); rewriteTag = okW ? "✅" : "❌"; }
+    string crossTag = !w.ready ? "—"
+        : SameTree(r.tree, w.tree) ? "🟢 两版形状一致"
+        : "🟡 两版形状不同（两版取的中点约定不同时，这是合法的 —— 答案不唯一）";
+
+    Console.WriteLine($"{(ok && okW ? "✅" : "❌")} {c.Title}   〔盲写重做：{rewriteTag}｜互证：{crossTag}〕");
+    if (!ok)  Console.WriteLine($"     ⛔ 旧版：{why}");
+    if (!okW) Console.WriteLine($"     ⛔ 盲写版：{whyW}");
 }
 
 Console.WriteLine("\n═══ 判题器②：形状与最优性（**不计错**，只打印判据）═══");
@@ -385,7 +411,8 @@ public class Solution {
     //
     //   ── 验收标准：
     //      ① 判题器⓪ 全绿（前提成立）；
-    //      ② 判题器① 全绿（中序 == 输入 / 高度平衡 / 合法 BST / 节点数对 —— 四条缺一不可）；
+    //      ② 判题器① 全绿（**两版互证**：10-10 版 + 下面的盲写重做版，
+    //         中序 == 输入 / 高度平衡 / 合法 BST / 节点数对 —— 四条缺一不可）；
     //      ③ 形状区 A 🟢 且 B 🟢（高度 == ⌈log2(n+1)⌉）；
     //      ④ 能一句话回答："**为什么把中点放在根上，就同时满足了 BST 和高度平衡？**"
     //      ⑤ 能一句话回答："**这题为什么不能用 700 那种判题器？**"
@@ -408,6 +435,48 @@ public class Solution {
         result.val = nums[mid];
         result.left = Build(nums,lo,mid - 1);
         result.right = Build(nums,mid + 1,hi);
+        return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  🔁 10-11 · 收官复盘日 · 盲写重做
+    //
+    //  背景：上面那版是 **10-10 当天边想边写** 出来的（当天最贵的一笔：`mid` 写成
+    //        `(hi − lo) / 2` ⇒ **三轮栈溢出**才抓到）⇒ 按同款规矩补一次
+    //        【不看旧代码、不看上面那段注释、不搜索，自己从零写】的版本。
+    //
+    //  ⛔ 盲写期间**不要往上翻** `SortedArrayToBST` / `Build`，也别翻笔记、别搜。
+    //  ✅ 只允许看：方法签名 + 下面这几条判据 + 判题器给的输出形状。
+    //
+    //  ⚠️ 新方法要与旧版**并存** ⇒ 不能再叫一个同名 `Build`（会与旧版撞名）。
+    //     两条路自己挑：另起一个名字，或者把递归写成方法**内部的局部函数**
+    //     （局部函数只在方法里可见 ⇒ 连 helper 都不用往类里开）。
+    //
+    //  ── 判据（这次要自己推一遍，别回忆）：
+    //     · 对外签名 `(int[] nums)` 装得下"当前在处理哪一段"吗？装不下 ⇒ 状态往哪放？
+    //     · `mid` 由谁算出来？—— **必须由 `lo` 和 `hi` 一起算**：
+    //       拿边界试，**单元素区间 `[x, x]` 的中点必须就是 `x`**，否则孩子落不了地（= 10-10 那个洞）
+    //     · 根吃掉的那个 `mid`，左右两段各取到哪儿？（跨不跨过它？）
+    //     · 终止条件用哪一句，能**同时**盖住"空数组"和"空孩子"两个入口？
+    //
+    //  ── 自查探针（判题器①会逐组打给你）：n = 5 → 树高 2 ｜ n = 4 → 树高 3 ｜
+    //     空数组 → `null` ｜ n = 1000 → 树高 10 ｜ 形状区 A / B 都要 🟢
+    //
+    //  ── 写完自己回答：**「高度最优」是"取中点"换来的，还是"递归"换来的？**
+    //     （拿形状区的数字回答）
+    // ══════════════════════════════════════════════════════════════
+    public TreeNode? SortedArrayToBSTRewrite(int[] nums)
+    {
+        return Build1(nums,0,nums.Length - 1);
+    }
+    TreeNode? Build1(int[] nums, int lo, int hi)
+    {
+        if(hi < lo) return null;
+        TreeNode result = new TreeNode();
+        int mid = (hi + lo) / 2;
+        result.val = nums[mid];
+        result.left = Build1(nums,lo,mid - 1);
+        result.right = Build1(nums,mid + 1,hi);
         return result;
     }
 }
