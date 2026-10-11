@@ -53,13 +53,23 @@ static void Check(string title, int?[] input, int expected)
     }
     catch (NotImplementedException) { }
 
+    // 10-11 加：收官日【盲写重做】版（10-04 登记：上面那版是"看过题解"之后写的）
+    int d = 0;
+    string rewriteTag = "⬜未实现";
+    try
+    {
+        d = new Solution().MaxDepthByStackRewrite(root);
+        rewriteTag = d == expected ? "✅" : "❌";
+    }
+    catch (NotImplementedException) { }
+
     bool ok = a == expected && b == expected;
     string bfsTag = b == expected ? "✅" : "❌";
-    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔BFS：{bfsTag}｜显式栈：{stackTag}〕");
-    if (!ok || stackTag == "❌")
+    Console.WriteLine($"{(ok ? "✅" : "❌")} {title}   〔BFS：{bfsTag}｜显式栈：{stackTag}｜盲写重做：{rewriteTag}〕");
+    if (!ok || stackTag == "❌" || rewriteTag == "❌")
     {
         Console.WriteLine($"     输入树：{Show(root)}");
-        Console.WriteLine($"     期望：{expected}   递归：{a}   BFS：{b}   显式栈：{(stackTag == "⬜未实现" ? "—" : c.ToString())}");
+        Console.WriteLine($"     期望：{expected}   递归：{a}   BFS：{b}   显式栈：{(stackTag == "⬜未实现" ? "—" : c.ToString())}   盲写重做：{(rewriteTag == "⬜未实现" ? "—" : d.ToString())}");
     }
 }
 
@@ -229,6 +239,58 @@ public class Solution {
                 tree.Push((cur, 2));
                 if(cur.right != null) tree.Push((cur.right, 0));
             }else if(times == 2)
+            {
+                int leftDepth = 0, rightDepth = 0;
+                TreeNode? l = cur.left, r = cur.right;
+                if (l != null) leftDepth = depth[l];
+                if (r != null) rightDepth = depth[r];
+                depth[cur] = Math.Max(leftDepth, rightDepth) + 1;
+            }
+        }
+        return depth[root];
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  🔁 10-11 · 收官复盘日 · 盲写重做（10-04 登记的欠账）
+    //
+    //  背景：上面那版 `MaxDepthByStack` 是 **10-04 当天"看过题解之后"** 写的
+    //        ⇒ 按规矩补一次【不看任何资料、自己从零写】的版本。
+    //
+    //  ⛔ 盲写期间**不要往上翻** `MaxDepthByStack`，也别翻笔记、别搜。
+    //  ✅ 只允许看：方法签名 + 下面这几条判据 + 判题器给的用例形状。
+    //
+    //  ── 判据（这次要自己推一遍，别回忆）：
+    //     · 递归里"孩子的答案"走**返回值**；可栈里只有节点，**没有返回值这个概念**
+    //       ⇒ 每个节点算出来的深度存哪儿？（`Dictionary<TreeNode,int>`？还是让栈元素自带？）
+    //     · 递归里"孩子算完了、回到我这里"是**自动**的；栈里怎么知道"可以合并了"？
+    //     · 结果必须按**后序**：孩子先出结果、父最后合并 —— 这是本题的硬约束
+    //
+    //  ── 自查探针：满树三层 → 3 ｜ 空树 → 0 ｜ 左斜链 `[1,2,null,3,null,4]` → **4**
+    //     （斜链专抓"深度只算了一半"或"忘了取 max"）
+    //
+    //  ── 写完自己回答：**它比递归版省空间吗？**
+    //     —— 答案会让"显式栈一定更省"这个直觉破产（10-04 已经实测钉过一次）。
+    // ══════════════════════════════════════════════════════════════
+    public int MaxDepthByStackRewrite(TreeNode? root)
+    {
+        if(root == null) return 0;
+        Stack<(TreeNode tree,int stage)> trees = new Stack<(TreeNode tree, int stage)>();
+        Dictionary<TreeNode, int> depth = new Dictionary<TreeNode, int>();
+        trees.Push((root, 0));
+        while(trees.Count > 0)
+        {
+            (TreeNode cur, int times) = trees.Pop();
+            if(times == 0)
+            {
+                trees.Push((cur, 1));
+                if(cur.left != null) trees.Push((cur.left, 0));
+            }
+            if(times == 1)
+            {
+                trees.Push((cur, 2));
+                if(cur.right != null) trees.Push((cur.right, 0));
+            }
+            if(times == 2)
             {
                 int leftDepth = 0, rightDepth = 0;
                 TreeNode? l = cur.left, r = cur.right;
