@@ -356,28 +356,24 @@ public class Solution {
     //         那切分时哪一段要跟着变？（先别写，先说出"变的是哪里"）
     public TreeNode? BuildTree(int[] preorder, int[] inorder)
     {
-        return BuildSubtree(preorder,inorder,0,preorder.Length - 1,0,inorder.Length - 1);
+        Dictionary<int,int> pos = new Dictionary<int, int>();
+        for(int i = 0;i < inorder.Length; i++)
+        {
+            pos[inorder[i]] = i;
+        }
+        return BuildSubtree(preorder,inorder,0,preorder.Length - 1,0,inorder.Length - 1,pos);
     }
-    TreeNode? BuildSubtree(int[] preorder, int[] inorder, int preLo, int preHi, int inLo,  int inHi)
+    TreeNode? BuildSubtree(int[] preorder, int[] inorder, int preLo, int preHi, int inLo,  int inHi, Dictionary<int,int> pos)
     {
         if(preHi < preLo || inHi < inLo) return null;
         TreeNode result = new TreeNode();
-        int mid = -1;
         int temp = preorder[preLo];
-        for(int i = inLo; i <= inHi; i++)
-        {
-            if(temp == inorder[i])
-            {
-                mid = i;
-                result.val = temp;
-                break;
-            }
-        }
-        if(mid < 0) throw new InvalidOperationException($"在 inorder[{inLo}..{inHi}] 里找不到根 {temp} ⇒ 切分已经错了，别让它悄悄产出一棵假树");
+        if(!pos.TryGetValue(temp, out int mid)) throw new InvalidOperationException($"inorder 里找不到 {temp} ⇒ 切分已经错了，别让它悄悄产出一棵假树");
+        result.val = temp;
         int leftsize = mid - inLo;
         int rightsize = inHi - mid;
-        result.left = BuildSubtree(preorder, inorder, preLo + 1, preLo + leftsize, inLo, inLo + leftsize - 1);
-        result.right = BuildSubtree(preorder, inorder, preHi - rightsize + 1, preHi, inHi - rightsize + 1, inHi);
+        result.left = BuildSubtree(preorder, inorder, preLo + 1, preLo + leftsize, inLo, inLo + leftsize - 1, pos);
+        result.right = BuildSubtree(preorder, inorder, preHi - rightsize + 1, preHi, inHi - rightsize + 1, inHi, pos);
         return result;
     }
 }
