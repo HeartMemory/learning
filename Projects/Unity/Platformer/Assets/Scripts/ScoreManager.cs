@@ -47,6 +47,13 @@ public class ScoreManager : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
+    // ── ⭐ 只读出口（10-12 加 · 为存档提供数据）──
+    //   判据：状态私有化之后，对外【只留只读属性】—— 给一条【读】的路，不给【改】的路。
+    //   （承 Breakout 的 `BrickSpawner`：对外只暴露 `TotalBricks` / `RemainingBricks` 两条只读状态）
+    //   ⚠️ 改分仍然只有下面 AddCoin / ResetScore 两个入口 —— 出口不等于开口。
+    public int Score => _score;
+    public int Coins => _coins;
+
     // ── 唯一入口：收到"吃到了几枚" ──
     //   ⭐ 内部仍是"状态 + 重画"：改分只在这里，画只在 Redraw 里（承 Breakout 的"唯一出口"）
     public void AddCoin(int amount = 1)
