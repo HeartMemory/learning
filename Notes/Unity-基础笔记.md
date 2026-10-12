@@ -2881,6 +2881,115 @@ EditorApplication.QueuePlayerLoopUpdate();  Physics2D.SyncTransforms();
 
 ---
 
+## 26. 持久化：落点、订阅时机与只读出口（10-12 · 存档落地）
+
+### 一、落点：`Application.persistentDataPath`
+
+```csharp
+private const string FileName = "save.json";
+private static string SaveFilePath => Path.Combine(Application.persistentDataPath, FileName);
+```
+
+| 判据 | 说明 |
+|---|---|
+| ⭐ **不能用相对路径** | 相对路径的基准 = **进程当前工作目录**，会随"怎么启动"变（承控制台那课：`dotnet run` ↔ 双击 exe 指到两处） |
+| ⭐ **只换一行** | 控制台版用 `AppContext.BaseDirectory`；Unity 版换成 `Application.persistentDataPath` —— **配方同形** |
+| 目录要不要自己建 | `persistentDataPath` **Unity 保证已存在**，不必 `CreateDirectory`（对比：自己拼出来的其它路径就要建） |
+| 为什么不用 `Application.dataPath` | 打包后它变成 `xxx_Data/`，**不可写 / 不该写** |
+
+### 二、结构判断：**不用单例**
+
+⭐ 判据（承第 19 章的单例那节）：
+
+> **单例只在"别人【主动找它】"时才需要。**
+
+- `GameManager` / `ScoreManager` 是**服务** —— 敌人（预制体）要喊裁判、UI 要问分数 ⇒ **必须**开 static 入口；
+- `SaveManager` 是**纯订阅者** —— 它去找事件，**没人来找它** ⇒ **不需要**单例。
+
+⭐ 推论：**"要不要单例"是个可判断的问题，不是风格偏好** —— 问"谁需要主动找到它？没有 ⇒ 别开。"
+
+### 三、⚠️ 订阅时机：`Awake` vs `Start`（今天的真坑）
+
+```csharp
+private void Start()          // ⚠️ 必须放 Start，不能放 Awake
+{
+    ...
+    GameManager.Instance.OnGameEnded += HandleGameEnded;
+}
+```
+
+**为什么**：`GameManager.Instance` 是它在**自己的 `Awake()`** 里赋值的；而 **Unity 不保证两个组件 `Awake` 的先后顺序** ⇒ 放在 `Awake` 里订阅，有几率拿到 `null`。
+
+⭐ **判据：只要"我依赖另一个组件的 `Awake` 已经跑完"，就该往 `Start` 挪。**
+（`Awake` = "我自己的初始化"；`Start` = "别人的初始化应该都做完了"。）
+
+⭐ 配套：**退订**放在 `OnDestroy`（承第 13 章那条"发布者比订阅者活得久会留悬空订阅"）。
+
+### 四、只读出口：**状态私有化之后，谁把数据交出来？**
+
+今天的实际卡点：`ScoreManager._score` / `_coins` 是 `private` 且**没有 getter** ⇒ **分数根本交不出来**，存档无从下手。
+
+修法（**+2 行**）：
+
+```csharp
+public int Score => _score;
+public int Coins => _coins;
+```
+
+⭐ 判据（承 Breakout 的 `BrickSpawner`：对外只暴露 `TotalBricks` / `RemainingBricks` 两条只读状态）：
+
+> **状态私有化之后，对外只留【只读状态属性】—— 出口 ≠ 开口。**
+> 改分仍然只有 `AddCoin` / `ResetScore` 两个入口。
+
+⭐ 更一般的说法：**"要存的东西，得有人肯交出来"** —— 加存档 / 加展示之前，先确认数据**有出口**。
+
+### 五、数据类为什么放"纯 C#"
+
+`SaveData.cs` **不继承 `MonoBehaviour`、不 `using UnityEngine`** —— 完全照 `LevelData` 的分层判据：
+
+> **能离开 Unity 的代码 = 能单测、能秒验、能复用。**
+
+配合**每个字段给初始值**（`= 1` / `= 0`）⇒ 得到"**旧存档缺字段 = 免费演化**"（详见 C# 笔记第 47 章第四节）。
+
+### 六、JSON 库：**同一项目别混两套**
+
+本项目已经在用 **`Newtonsoft.Json`**（`com.unity.nuget.newtonsoft-json`，见 `GameManager` 读 `levels.json`）⇒ 存档**跟着用同一套**。
+
+| | Newtonsoft（本项目） | `System.Text.Json` | Unity 自带 `JsonUtility` |
+|---|---|---|---|
+| 认什么 | **public 字段** ✅（也认属性） | **public 属性**（⚠️ 字段静默给默认值） | 只认 public 字段 / `[SerializeField]` |
+| 限制 | — | — | 不支持 `Dictionary` / 不支持顶层数组 |
+
+⭐ 判据：**换库 = 换契约**（认字段还是属性、大小写敏不敏感），混用会让"同一个数据类在两处表现不同"。
+
+### 七、两条要守的规矩
+
+| 规矩 | 原因 |
+|---|---|
+| ⚠️ **日志只打文件名**，不打完整路径 | `persistentDataPath` 里含**公司名** ⇒ 仓库红线（0 公司名） |
+| ⚠️ **新增文本只能用英文/数字** | **中文字体资产还没做**（Pending 欠账）⇒ 写中文会显示成**方块** |
+
+### 八、⭐ 可复用配方：Unity 存档（成品骨架）
+
+```
+SaveData.cs      —— 纯 C# 数据类（[Serializable] + public 字段 + 每字段初始值）
+SaveManager.cs   —— MonoBehaviour（不是单例）
+   ├ Start()      ：读档（三态）→ 订阅 GameManager.Instance.OnGameEnded
+   ├ OnDestroy()  ：退订
+   ├ LoadFromDisk()：try { 读 + 解析 + 判 null } catch (FileNotFoundException) → NotFound
+   │                 catch (… when IOException/UnauthorizedAccess/JsonException) → Corrupted
+   └ SaveToDisk() ：Serialize → WriteAllText（原子写待补）
+装配：把 SaveManager 挂到 GameManager 那个物体上（**组件，不是子物体**）+ 保存场景
+```
+
+### 九、⏳ 待办（10-13 起）
+
+- **原子写**（与控制台练习 TODO 3 同一套配方）；
+- **让存档"用起来"**：HUD 显示 `BEST:<最高分>`（⚠️ 英文/数字）＋ 关卡进度；
+- **破纪录判定**：谁来判"这次是新纪录"（`HandleGameEnded` 里判 vs `ScoreManager` 自己判）。
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
@@ -2929,7 +3038,7 @@ EditorApplication.QueuePlayerLoopUpdate();  Physics2D.SyncTransforms();
 ### 🔴 真账（有后果，要排期）
 
 - [ ] **视野只探一条水平线（10-05 记）**：`Physics2D.Raycast` 从身体中心水平发 → 玩家跳高就"看不见" → 加斜向射线或 `OverlapCircle` 视野（做"追逐 / 攻击"时一起）
-- [ ] **中文字体资产（09-23 记）**：默认 `LiberationSans SDF` 无中文字形 → 下载开源可商用中文字体 → 创建 TMP 字体资产（`Atlas Population Mode = Dynamic`），或加进默认字体的 **Fallback List**
+- [ ] **中文字体资产（09-23 记）**：默认 `LiberationSans SDF` 无中文字形 → 下载开源可商用中文字体 → 创建 TMP 字体资产（`Atlas Population Mode = Dynamic`），或加进默认字体的 **Fallback List** ｜ ⚠️ **10-12 补实测后果（第二处）**：做"存档可见化"时想加中文标签被它**直接挡住**、只能退回英文/数字（见本册第 26 章第七节）⇒ 这条账现在**卡着两处** UI（存档的"新纪录"提示 + 错误提示）
 - [ ] **UI 字号与安全边距（09-23 记）**：当前字号 36 在 1920×1080 基准下偏小（建议 60~72）；确认左上角 HUD 在超宽/极窄比例下仍完整可见
 - [ ] ⚠️ **Breakout 素材待更新（10-01 记）**：画面新增**触屏左右按钮**（`LeftButton` / `RightButton`，见本册第 15 章）→ **09-26 的录屏与 3 张截图已与工程不一致** → 待重录 **≤30 秒**录屏 + 3 张**带按钮**的截图（命名口径：`demos/breakout-demo.mp4` + `breakout-NN-<描述>.png`）
 - [ ] **土狼时间（coyote time）+ 跳跃输入缓冲（10-02 记）**：① **走离平台边缘后仍允许短暂起跳**（一般 0.1~0.15s）② **落地前就按了跳**，落地那一瞬自动执行 —— 两者都是"**给输入 / 传感器加时间容错**"，与第 16 章第八节"传感器跟不上那一瞬"同源。⭐ 实现要点：用**计时器**记"上次接地 / 上次按跳"的**时刻**，而不是用布尔 —— 布尔把"刚刚"和"很久以前"混为一谈。

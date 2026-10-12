@@ -2142,10 +2142,141 @@ Join（哈希连接）：                6 ms
 
 | 盲区 | 具体缺口 | 回访动作 |
 |---|---|---|
-| **异常家族 + 契约** | 三连垮（#6 家族归属 / #7 catch 规矩与重抛 / #9 抛-Try 选择判据） | 写存档读档时**亲手**用一次：坏 JSON → `JsonException`、文件缺失 → Try 契约、`throw;` 重抛 |
-| **相对路径基准** | 答"不会" —— 这是**动手就忘不了**的坑 | 存档落地时在 Unity 里实测 `Application.persistentDataPath` 与 `Directory.GetCurrentDirectory()` 的差别 |
+| **异常家族 + 契约** | 三连垮（#6 家族归属 / #7 catch 规矩与重抛 / #9 抛-Try 选择判据） | 写存档读档时**亲手**用一次：坏 JSON → `JsonException`、文件缺失 → Try 契约、`throw;` 重抛 ｜ ⭐ **10-12 销账（2/3）**：坏 JSON → `JsonException`、文件缺失 → `NotFound`（Try 契约）**已亲手落笔**（本册第 47 章 + `CSharpPractice/2026/10/12/SaveSystem`），`catch` 顺序（子类在前）也实测过；⚠️ 只剩 **`throw;` 重抛**没用过 ⇒ 那条继续挂着 |
+| **相对路径基准** | 答"不会" —— 这是**动手就忘不了**的坑 | 存档落地时在 Unity 里实测 `Application.persistentDataPath` 与 `Directory.GetCurrentDirectory()` 的差别 ｜ ⭐ **10-12 销账（1/2）**：`AppContext.BaseDirectory` + `Path.Combine` 已在控制台练习里亲手落笔、`Application.persistentDataPath` 已在 Platformer 落地（Unity 本册第 26 章第一节）；⚠️ "把两个基准**摆在一起实测对照**"这一步**还没做** |
 | **LINQ 延迟执行** | 答"不知道"（状态机 / 闸门位置 / 分组器不收手） | 本册 📌 回访清单里 **10-09 记的两条**（`0049` 用 LINQ 重写对照 / 字符串排序的文化差异）；顺手各数一次调用次数：`Where + First` vs `GroupBy + Take(1)` |
 | **半错模型（最值钱的一条）** | #2 把 `==` 简化成"比地址" | 记牢：**`==` 比什么由类型定义**（`string` 比内容、`int` 比数值、无重载 class 比地址）—— 简化模型一旦遇上重载运算符的类型就会把人带沟里 |
+
+---
+
+## 47. 存档 / 读档：三态契约 + 落点 + 原子写（10-12 · Block 4 第 1 课）
+
+### 一、配置表 vs 存档（一句分界）
+
+| | 配置表（10-08 学的） | **存档（今天）** |
+|---|---|---|
+| 谁写它 | 我，随游戏一起发布 | **运行时**，程序自己写 |
+| 会怎么坏 | 只可能是我写错 | 断电 / 杀进程 / 磁盘满 / **你自己下一版的代码** |
+| 会演化吗 | 不会 | **会**（加新字段是常态） |
+
+⭐ 判据：**"最可能弄坏存档的是你自己的下一个版本，不是玩家。"** ⇒ 所以容错不是"防作弊"，是"别让一次坏档把玩家的进度变成闪退"。
+
+### 二、落点：为什么不能用相对路径
+
+- 相对路径的基准 = **进程当前工作目录**（`Directory.GetCurrentDirectory()`）—— `dotnet run` 是**项目目录**、双击 exe 是**输出目录** ⇒ **同一个字符串指到两处**。
+- ⇒ 要挂在一个"**确定的基准**"上：控制台用 `AppContext.BaseDirectory`，Unity 用 `Application.persistentDataPath`。**配方同形，只换那一行。**
+
+拼法（照 `Path.Combine`）：
+
+```csharp
+private static string SaveFilePath => Path.Combine(Application.persistentDataPath, "save.json");
+```
+
+| 陷阱 | 为什么不行 |
+|---|---|
+| ⚠️ `Path.GetFullPath("save.json")` | 它**确实**给你绝对路径 —— 但它是**拿工作目录当基准**算的 ⇒ 等于把病根**焊死**在代码里 |
+| ⚠️ `Path.GetTempPath()` | 临时目录会被系统**清理** ⇒ 存档"莫名消失" |
+
+⭐ **判据：看这个路径是从哪个基准长出来的，而不是看它长得像不像绝对路径。**
+⭐ 另一条：**基准的选法取决于"这个文件该活多久"**（配置表 = 随包发布；存档 = 跨局长期）。
+
+### 三、读取：三态契约
+
+```csharp
+public enum LoadState { Loaded, NotFound, Corrupted }
+```
+
+⭐ **一个 `bool` 装不下三态**：「第一次玩」是**正常情况**（新玩家），「存档坏了」要**告诉玩家**（他的存档没了）—— 一个 `bool` 做不到"**既降级、又报警**"。
+
+| 实际发生 | 谁把它说出来 | 归哪一态 |
+|---|---|---|
+| 文件**不存在** | `FileNotFoundException` | `NotFound` |
+| 读不了（被占用 / 没权限） | `IOException` / `UnauthorizedAccessException` | `Corrupted` |
+| 文本**不是合法 JSON** | `JsonException` | `Corrupted` |
+| 内容是合法 JSON、但**正好是 `null`** | ⚠️ **没有异常** —— 只能判返回值 | `Corrupted` |
+
+**判据链**（顺次问两句）：① **文件在不在？** 在 ⇒ 就不可能是 `NotFound`；② **内容能不能用？** 不能用 ⇒ 只剩 `Corrupted`。
+
+**两条底线**（"容错"具体指什么）：
+
+1. 文件**不存在** ⇒ 用**默认档**起步（不是崩）；
+2. 文件**坏了** ⇒ 也要能**降级**（但要能**区分**出来 —— 这就是三态的意义）。
+
+⚠️ 别走另一个极端：**容错 = 可控的降级，不是"把坏的说成好的"**。`Corrupted` 是**明确承认坏了**，再做两件事：给一份能用的 + 让上层知道。
+
+**`catch` 规矩（承第 43 章，今天亲手又踩一遍）**：
+
+- `FileNotFoundException` 必须在 `IOException` **之前**（子类在前），写反 = **CS0160**；
+- `UnauthorizedAccessException` **不在** `IOException` 那一支 ⇒ 得单独列；
+- 只用**异常筛选器**接你预期的几类，**别的继续冒**（别替 bug 捂盖子）：
+  ```csharp
+  catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+  ```
+
+### 四、⭐⭐ 缺字段 = 免费演化（今天最值钱的一条）
+
+> **JSON 里没有的键 ⇒ 反序列化后取【属性/字段的初始值】**（不崩、不抛、也不是 `null`）
+
+⇒ **加新字段时，一行迁移代码都不用写**：旧存档照常读，新字段拿默认值。
+
+**实证**：判题器给出 `{"HighestScore": 500}`（一份缺字段的旧档）⇒ 结果 `Loaded` + `HighestScore = 500` + 其余字段 = 各自初始值（`UnlockedLevel = 1`），**四格全绿**。
+
+⚠️ 前提是**每个字段都给了初始值**（`= 0` / `= ""` / `= 1`）—— 不给，就真的会拿到 `default`（引用类型是 `null`）。
+
+### 五、写入：原子写（`TODO 3`，10-13 补）
+
+直接覆盖写的风险：**写到一半崩 / 断电 ⇒ 存档变半截，旧的也没了。**
+
+⇒ 三步：① 先写进一个**临时文件** ② 成功之后再把它**整体替换**成正式文件 ③ 收尾不留残渣。
+
+**判据**：① 走完目标文件 = 本次内容 ② 不留 `.tmp` ③ 中途失败时**旧档不被破坏**。
+
+⚠️ 待验：**`File.Replace` 要求目标文件已存在** ⇒ 第一次存档（目标不存在）得走另一支，或者干脆用 `File.Move(tmp, dest, overwrite: true)`。
+
+### 六、编译器在替我们守契约（今天三个报错都是"契约"）
+
+| 报错 | 意思 | 教训 |
+|---|---|---|
+| **CS0177** | 控制离开方法前必须对 `out` 参数赋值 | `out` 的「**每个出口都必须赋值**」是**编译器强制**的 —— 把赋值挪进 `try` 之后，**每个 `catch` 里也得自己赋** |
+| **CS0161** | 并非所有代码路径都返回值 | ⭐ **「加分支」≠「换分支」**：在无条件的 `return X` **前面**插 `if (...) return Y;` 时，**别把那句 `return X` 删掉** —— 它管着"不成立"那一支 |
+| **CS8601** | 可能的 null 引用赋值 | `Deserialize<T>` 返回 **`T?`** ⇒ 用**可空局部变量**接住、判完再赋给非空目标（别用 `!` 压制） |
+
+### 七、两条元判据（今天收口的）
+
+> ① **「坏」有两种** —— **读不出来**（用**异常**报告）／ **读出来了但内容不成立**（用**返回值**报告）。
+> 第二种**永远不会抛** ⇒ `catch` 写再多也接不住它 ⇒ **必须判返回值**。
+
+> ② **契约变了，「报告坏消息」的手段就得跟着换** —— **异常 / 返回值 / 枚举**，三选一，别在一段代码里混着用。
+> 实例：第 43 章那句 `levels ?? throw new InvalidDataException(...)`（**抛型**）与今天的 `parsed is null → return Corrupted`（**Try 型**）**兜的是同一件事**（"解析成功、但交出 null"），只是**报告手段**换了。
+
+### 八、`try` 该包什么（今天包错过一次）
+
+❌ 错法：`try` 里只放**判断**，会抛的**动作**（`File.ReadAllText` / `Deserialize`）留在外面 ⇒ 三个 `catch` 全是**死代码**（编译器**不报错**，最危险的那种错）。
+
+⭐ 判据：
+
+> **`catch` 只能接住「写在 `try` 里面」的东西。**
+> `try` 包的是**动作**，`catch` 是这些动作的**应急预案**。
+
+### 九、⭐ 可复用配方：存档读写（成品）
+
+```csharp
+// 读（三态 + 两条底线）
+try
+{
+    string json = File.ReadAllText(SaveFilePath);
+    SaveData? parsed = JsonSerializer.Deserialize<SaveData>(json);   // 返回 T? ⇒ 用可空局部变量接住
+    if (parsed is null) { data = new SaveData(); return LoadState.Corrupted; }   // "不抛"的那一种坏
+    data = parsed;
+    return LoadState.Loaded;
+}
+catch (FileNotFoundException) { data = new SaveData(); return LoadState.NotFound; }   // 子类在前
+catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is JsonException)
+{ data = new SaveData(); return LoadState.Corrupted; }
+
+// 写（朴素版；原子写见第五节）
+File.WriteAllText(SaveFilePath, JsonSerializer.Serialize(data));
+```
 
 ---
 
