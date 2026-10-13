@@ -2280,6 +2280,181 @@ File.WriteAllText(SaveFilePath, JsonSerializer.Serialize(data));
 
 ---
 
+## 48. async / await 入门（一）：计时工具 + 「等」的两种成本（10-13 · Block 4 第 2 课）
+
+### 一、`Stopwatch`：今天第一次用（速查）
+
+```csharp
+Stopwatch sw = Stopwatch.StartNew();   // ① 建表 + 立刻开走（写在【被测代码之外】）
+// ... 被测的那段活 ...
+sw.Stop();                             // ②（可选）停表；不停也能读，只是它还在走
+long ms = sw.ElapsedMilliseconds;      // ③ 读总毫秒
+```
+
+| 成员 | 类型 | 说明 |
+|---|---|---|
+| `Stopwatch.StartNew()` | **静态**方法 → `Stopwatch` | 建表 + 立刻开走（= `new Stopwatch()` + `Start()`） |
+| `sw.Start()` / `sw.Stop()` | 实例方法 | 起 / 停，**可反复**；⚠️ 没 `Start()` 也能读出 0 |
+| `sw.Reset()` | 实例方法 | 归零 + 停住（表还在，可以再 `Start`） |
+| `sw.Restart()` | 实例方法 | 归零 + 重新开走（跑多次取平均时最常用） |
+| `sw.Elapsed` | `TimeSpan` | 时间跨度：`TotalMilliseconds`（**double，总数**） / `Milliseconds`（**int，只是"秒的零头"0~999**） |
+| `sw.ElapsedMilliseconds` | `long` | 最常用：总毫秒（**整数、向下截断**） |
+| `sw.ElapsedTicks` | `long` | 最高精度；换算秒 = `ticks / Stopwatch.Frequency` |
+| `Stopwatch.Frequency` | **静态** `long` | 每秒多少 tick（本机可打印出来看） |
+| `sw.IsRunning` | `bool` | 表在不在走 |
+| `Stopwatch.GetTimestamp()` | **静态** `long`（net7+ 另有 `GetElapsedTime(起点)`） | 高频时间戳；不需要"表对象"时可用 |
+
+### 二、⭐ `Stopwatch` 三条最常踩的坑
+
+| # | 坑 | 判据 |
+|---|---|---|
+| 1 | **`Elapsed.Milliseconds` 不是"总毫秒"** | 它是"**秒后面的零头**"（0~999）⇒ 要总数用 `ElapsedMilliseconds` 或 `Elapsed.TotalMilliseconds` |
+| 2 | **`ElapsedMilliseconds` 是整数** | 测"小于 1 ms"的活会经常读到 `0` ⇒ 要高精度用 `Elapsed.TotalMilliseconds`（double）或 ticks（承刷题性能区那条"读数太小看不出斜率"） |
+| 3 | **`Stopwatch` 是"经过的时间"，不是"现在几点"** | 它单调递增、不受系统时间改动影响 ⇒ 这是它**比 `DateTime` 适合计时**的理由 |
+
+（⚠️ 一个实例别在多条线程上共用 —— 要并行计时就各 `StartNew()` 一个。）
+
+### 三、别和这几个"计时"混（API 对照表）
+
+| API | 语义 | 适合拿来做 | ⛔ 坑 |
+|---|---|---|---|
+| **`Stopwatch`** | **经过的时间**（单调、高精度） | **测代码快慢** | 它不告诉你"现在几点" |
+| `DateTime.Now` / `UtcNow` | **墙上时钟的时刻** | 记"什么时候发生" | 会被系统对时 / 时区 / 夏令时改动 ⇒ **别拿它量耗时** |
+| `Environment.TickCount64`（`TickCount` 是 int 版） | 开机以来的毫秒数 | 粗略超时 / 计时 | 精度低（约 10~16 ms）；⚠️ int 版约 **24.9 天**回绕 |
+| `TimeSpan` | **一段时间**（不是时刻） | `Elapsed` 的类型；做加减 | `Milliseconds` vs `TotalMilliseconds`（见上） |
+| `Thread.Sleep(n)` | 让**当前线程**睡 n ms | 真·阻塞（模拟耗时） | ⚠️ **占着线程**；主线程上会把画面卡死（Unity 里尤其） |
+| `Task.Delay(n)` | 造一个"n 毫秒后完成"的 `Task` | 异步等待（配 `await`） | ⚠️ **不占线程**（等在内核定时器里）；但**必须 `await`**，不然它就是干等着一张没人看的票据 |
+| `Task.Run(() => …)` | 把**吃 CPU** 的活丢进线程池 | 并行**计算** | ⚠️ 不是给 IO 用的（IO 本来就不占线程） |
+
+⚠️ **两个"睡"的精度都约 15 ms**（Windows 计时器分辨率）⇒ 判据要留余量：`Task.Delay(700)` 读到 700~720 ms 都算正常。
+
+### 四、⭐⭐ 今天的主线判据：「等」的两种成本
+
+| | 那一秒里**谁在等** | 线程在干什么 |
+|---|---|---|
+| `Thread.Sleep(1000)` | **线程在等**（被 OS 挂起，**还占着**） | 什么也不干，也别想干别的（Unity 里 = 卡帧） |
+| `await Task.Delay(1000)` | **任务在等**（票据在等内核定时器） | **线程被还回去了** —— 去干调用方剩下的活；1 秒后可能**换一条线程**回来接着跑 |
+
+⭐ 一句话：**「阻塞」的本质 = 一条线程被占住，却什么也没干。**
+
+**并发模型三层**（谁负责"切换"）：
+
+| 层 | 谁切 | 代价 | C# 里对应 |
+|---|---|---|---|
+| 进程 | 操作系统 | 最重（独立地址空间） | 一个 exe |
+| 线程 | **OS 调度器**（抢占式） | 重：约 1 MB 栈 + 上下文切换 | `Thread` / 线程池 |
+| **状态机 / 协程** | **程序自己**（**协作式**：不让出就没法切） | 极轻：一个对象 | `async` 编译出的状态机 ／ Unity 的 `IEnumerator` |
+
+### 五、Unity 协程 `IEnumerator` vs `async / await`（对照）
+
+| | Unity 协程 `IEnumerator` | C# `async / await` |
+|---|---|---|
+| 谁在推进 | **PlayerLoop**（每帧问一次"能往下走了吗"） | 线程池 / **IO 完成通知** |
+| 跑在哪条线程 | 主线程 | 起点 = 当前线程；**`await` 之后不保证** |
+| 让出时机 | 写 `yield` 才让 | 写 `await` 才让（**同族：协作式**） |
+| 返回值 | ❌ 只能靠字段 / 回调 | ✅ `Task<T>` |
+| `try/catch` | ❌ **包不住**两段之间的异常 | ✅ 异常在 `await` 处**重新抛出** |
+
+⭐ **同一个手法**（承第 33 章闭包那条线）：两者都被编译器**整段改写成状态机类**；差别只在"**谁负责叫醒它**"。
+⚠️ 控制台**没有 SynchronizationContext** ⇒ `await` 之后**大概率换线程**；Unity **有** ⇒ 会回到主线程（这就是它"看起来像协程"的原因）。
+
+### 六、今天踩的坑：`CS0119`「`Stopwatch` 是一个类型」
+
+| 项 | 内容 |
+|---|---|
+| 症状 | `error CS0119: "Stopwatch"是一个类型，这在给定的上下文中无效` |
+| 写法 | `return Stopwatch;`（把**类型名**当值返回了） |
+| 原因 | `Stopwatch` 是**类型**（设计图），能 `return` 的只有**值**（`long`） |
+| 修复 | 先 `Stopwatch sw = Stopwatch.StartNew();`，最后 `return sw.ElapsedMilliseconds;` |
+| ⭐ 判据 | **类型名不能站在"值"的位置上** —— `sw`（实例）才是那块表；`Stopwatch`（类型）只是它的设计图。这条错误**编译期**就报，不用等运行 |
+
+### 七、`Task` API 速查（10-13 补）
+
+⭐ 总判据：**看一个 API 是不是"真异步"，只问一句 —— 它在等的时候占不占线程？**
+
+**① 造票据（怎么"启动"一件事）**
+
+| API | 语义 | 占线程？ |
+|---|---|---|
+| `Task.Delay(ms)` / `Task.Delay(ms, ct)` | 定时器等待 | ❌ **不占** |
+| `Task.Run(Action)` / `Task.Run<T>(Func<T>)` | 把活丢进线程池 | ✅ 占一条池线程 |
+| `Task.CompletedTask` | 已完成、**无结果** | ❌ |
+| `Task.FromResult(v)` | 已完成 + 带结果 | ❌ |
+| `Task.FromException(e)` / `Task.FromCanceled(ct)` | 已完成 + 故障 / 已取消 | ❌ |
+| 你自己的 `async` 方法 | 编译器替你返回票据 | 看里面有啥 `await` |
+| ⛔ `new Task(...)` + `.Start()` | 老写法（把 Task 当线程使） | ✅ |
+
+**② 等票据（等一个 / 一起等）**
+
+| API | 语义 | 备注 |
+|---|---|---|
+| `await t` | 等完成 + 取结果 | ⚠️ 若 `t` **已完成** ⇒ **不让出**、同步继续 |
+| `Task.WhenAll(tasks)` | **全部**完成才完成 | 并行汇合点；异常**收集**在 `t.Exception`（`AggregateException`）里 |
+| `Task.WhenAny(tasks)` | **任一**完成就完成 | 返回"**那个已完成的** Task" |
+| ⭐ **超时配方** | `await Task.WhenAny(活, Task.Delay(ms))` | 谁先完成等谁 |
+| ⛔ `Task.WaitAll/WaitAny`、`t.Wait()`、`t.Result` | **阻塞**版 | 把线程占住 = 退回同步；UI / Unity 上下文里**易死锁** |
+
+**③ 读状态（不等待）**
+
+| API | 语义 |
+|---|---|
+| `t.IsCompleted` / `IsCompletedSuccessfully` / `IsFaulted` / `IsCanceled` | 四个布尔 |
+| `t.Status` | 枚举：`WaitingForActivation` / `RanToCompletion` / `Faulted` / `Canceled` |
+| `t.Exception` | 故障信息（**异常是"装在票据里"的**，`await` 那一刻才重新抛出） |
+
+**④ 取消（协作式：是"请求"，不是"强杀"）**
+
+| API | 语义 |
+|---|---|
+| `CancellationTokenSource cts = new()` | 造一个"取消开关" |
+| `cts.Token` | 把令牌传给任务 |
+| `cts.Cancel()` | 按下开关（**请求**取消） |
+| `ct.IsCancellationRequested` | 干活时自己查一眼 |
+| `ct.ThrowIfCancellationRequested()` | 查到就抛 `OperationCanceledException` |
+| `Task.Delay(ms, ct)` 等 | 支持取消的 API 会**自己响应** |
+
+**⑤ 给库 / Unity 用的几个**
+
+| API | 用途 |
+|---|---|
+| `Task.Yield()` | 主动让出一次（异步世界的 `yield return null`） |
+| `ConfigureAwait(false)` | 不等回原上下文（库代码常用；⚠️ 在 Unity 里会影响"是否回到主线程"） |
+| `IProgress<T>` / `Progress<T>` | 上报进度 |
+| `ValueTask` / `ValueTask<T>` | 轻量版（省一次分配）—— ⭐ 知道名字即可，暂不学 |
+
+### 八、实测对账（10-13 · 四组全 ✅）
+
+| 实验 | 期望 | 实测 |
+|---|---|---|
+| A 串行 `await`（3 × 300 ms） | ≈ 900 ms | **940 ms** |
+| B 并发 `Task.WhenAll`（3 × 300 ms） | ≈ 300 ms | **308 ms** |
+| C-4A `Task.Delay` 并发（5 × 700 ms） | ≈ 700 ms | **711 ms** |
+| C-4B `Thread.Sleep` 串行（5 × 700 ms） | ≈ 3500 ms | **3565 ms** |
+
+⭐ 两处差值最值钱：**940 → 308**（等待**重叠**了）、**3565 → 711**（同样等 700×5，一个占着线程一道道来、一个没占线程）。
+
+**线程号观察**：调用方 **7** → `[进入]` **7** → `[await 之后]` **7**。
+
+| 现象 | 判据 |
+|---|---|
+| 号**不同** | ⭐ **铁定换了线程**（唯一确定的判据） |
+| 号**相同** | ⚠️ 只能说"**这次恰好**排回同一条" —— **不能**推断成"永远不换"。原因：控制台**没有 SynchronizationContext** ⇒ 续体交给**线程池**；任务短 + 池里有空闲时很容易排回原线程 |
+
+### 九、⭐ 三条收口判据（今天最终版）
+
+1. **接上 `await` 后半段的是"续体（continuation）"** —— 它由**完成票据的那一方**（定时器到期 / IO 完成通知）**排进线程池**，再由**池里任意一条空闲线程**执行。
+   ⇒ 所以"谁跑完后半段"是**线程池调度决定的**，不是"某条线程负责到底"（也不是"当前进程"这么粗的东西）。
+   ⚠️ Unity 里不一样：**有 SynchronizationContext** ⇒ 续体被 **Post 回主线程**（这才是协程感的来源）。
+2. **`Task.Delay` 那一秒"占"的是「一个计时器条目 + 一张票据」**（成本 ≈ 几个字节的对象），**不是线程**。
+   类比：**设闹钟**（设好就走人）vs `Thread.Sleep` = **站在闹钟旁边等**（那 1 秒你什么也干不了）。一个线程能伺候成千上万个定时器。
+3. ⛔ **"CPU 空转"版本不会有并发效果**：`while (…) { }` 忙等 **100% 占着当前线程**、**顺序执行**、还把 CPU 烧满 ⇒ 那不是"等别人"，是"自己烧"。
+   ⇒ 那种活归 **`Task.Run`**（丢进线程池，靠**多条线程**真并行；⚠️ 并发度受池线程数限制）。
+   ⭐ **二者分界一句话：它是在「等别人」还是在「自己烧 CPU」？**（异步 = 用少量线程伺候大量等待；并行 = 真开线程同时算）
+
+> **本课总判据**：**同步 = 线程在等；异步 = 任务在等**（线程被还回去了）；**串行 vs 并发差的是「等能不能重叠」，不是「等得久不久」**。
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **`101` 的 DFS（`Stack`）迭代版（10-05 记）**：现在写的是**队列成对版** → 用 `Stack<TreeNode?>` 再写一版，对照"队 vs 栈"哪种更自然（收敛到第 36 章那套"推进机制 vs 模拟调用栈"）
