@@ -3009,6 +3009,75 @@ SaveManager.cs   —— MonoBehaviour（不是单例）
 
 ---
 
+## 27. Runner 立项：3D/URP 模板 + MCP 桥接装配（10-13 · Block 4 第 2 课）
+
+### 一、新工程的第一个岔路：URP vs Built-In
+
+| | **Universal 3D（URP）** | 3D（Built-In） |
+|---|---|---|
+| 现状 | Unity 6 官方主推、实习 JD 常见 | 老管线，教程多 |
+| 本项目 | ✅ **选了它**（`com.unity.render-pipelines.universal 17.3.0`） | —— |
+| 代价 | 材质要用 URP/Lit；多出 Renderer / Volume 概念 | 与 Platformer 同族、旧知识可直接复用 |
+
+⭐ 判据：**新工程跟官方主推走**；⚠️ 别在同一个工程里混两套管线（材质会认错管线）。
+实测：Runner 的 `Packages/manifest.json` = URP `17.3.0`，编辑器 `6000.3.23f1`。
+
+### 二、为什么新工程没有 `窗口 → MCP for Unity`
+
+**根因：它不是 Unity 自带的，是一个第三方 git 包。**
+
+| 证据 | 内容 |
+|---|---|
+| `Platformer/Packages/manifest.json` | 有 `"com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main"` ⇒ 那个工程才有菜单 |
+| 新建的 `Runner/Packages/manifest.json` | **没有这一行** ⇒ 所以菜单里什么都不出现 |
+
+**装法**：`窗口 → 包管理器` → 左上 `+` → **从 git URL 安装包…** → 粘贴上面那个 URL → 安装。
+
+- ⚠️ 拉包要走网络（本机走代理）；装完**菜单名保持英文**（`MCP for Unity`）—— 第三方包不随中文化；
+- 装包期间 Unity 会重新编译一次脚本，界面会停一下，正常。
+
+### 三、就绪判据（**两侧缺一不可**，承 10-08）
+
+| 侧 | 判据 |
+|---|---|
+| **Unity 侧** | `窗口 → MCP for Unity` 显示 **`Session Active (<工程名>)`** |
+| **客户端侧** | 本会话**看得到 `unityMCP` 工具**，且**能真调一次只读动作** |
+
+⭐ **Transport 必须成对**（配错 = `No Unity Editor instances found`）：
+
+| 插件侧 | 客户端侧 |
+|---|---|
+| `HTTP Local` | `{"type":"http","url":"http://127.0.0.1:8080/mcp"}` |
+| `Stdio` | `{"command":"uvx","args":[…,"--transport","stdio"]}` |
+
+⚠️ **端口在听 ≠ 本会话能用上**：MCP 工具列表**只在会话启动时读一次** ⇒ "桥活着"和"我能用"是两件事（10-08 实测踩过；若工具列表里没有，重启会话即可）。
+
+### 四、立项三件事（今天实际做的）
+
+| 事 | 结论 |
+|---|---|
+| **`.gitignore`** | ⭐ **不用新建**：`Projects/Unity/.gitignore` 覆盖**子目录里所有 Unity 项目**（`git check-ignore -v` 实测 4 条命中 `Library/` `Temp/` `Logs/` `UserSettings/`）|
+| **目录规范** | **用到再建**；`Assets/Scripts` **交给 Unity 建**（自带 `.meta`）—— ⚠️ 手建目录**不会**产生 `.meta`。空目录 git 不跟踪（只有 `.meta` 会进），提前建 = 纯噪音 |
+| **Build Settings** | `SampleScene` 已在表内（MCP 读到 `buildIndex 0` / `enabled`）—— 无需动作 |
+
+### 五、首次导入的 `.meta` 口径（判据要换一格）
+
+- 常规判据「`?? *.meta` 期望空」**不适用于新工程首导**（那时所有资源都是新文件）；
+- 换成**数量对账 + 逐项列**：本次 = **14 个资源文件 + 7 个文件夹 = 21 个 `.meta`** ✅；
+- ⚠️ **`ProjectSettings/` 与 `Packages/` 下的文件本来就没有 `.meta`**（只有 `Assets/` 里有）—— 别把它们算成"缺 meta"；
+- ⚠️ 文件夹自己的 `.meta` 躺在**父目录**里（如 `Assets/Scenes.meta` 在 `Assets/` 下）。
+
+### 六、MCP 只读侦察示例（今天真跑过）
+
+| 调用 | 拿到什么 | 用途 |
+|---|---|---|
+| `manage_scene(action='get_build_settings')` | 场景清单（路径 / GUID / buildIndex / enabled） | ⭐ **最硬的连通判据** |
+| 资源 `mcpforunity://project/info` | `projectRoot` / `unityVersion` / `platform` | 确认**连的是哪个工程** |
+
+⚠️ MCP 的写盘能力虽强（建目录 / 摆物件 / 复制场景 / 加 Build Settings），**仍受"报方案 → 用户点头 → 才写盘"约束**。
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
