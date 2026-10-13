@@ -86,15 +86,39 @@ public class SaveManager : MonoBehaviour
         SaveToDisk();
     }
 
-    // ───────────────── 写档（朴素版）─────────────────
+    // ⭐ 临时文件的落点：必须与正式档【同目录】—— "原子"只保证在**同一文件系统内**
+    //    派生链只有一个方向：FileName → SaveFilePath → TempFilePath
+    //    用【计算属性】而不是字段：每次现算 ⇒ 永远和源头一致
+    private static string TempFilePath => SaveFilePath + ".tmp";
+
+    // ───────────────── 写档：原子写（10-13）─────────────────
     private void SaveToDisk()
     {
-        // ⏳ TODO（10-13）：这里就是「原子写」的【第二个落点】——
-        //    与控制台练习的 TODO 3 用【同一套配方】（先写临时文件 → 成功后再整体替换）。
-        //    今天先写朴素版把闭环跑通，明天两处一起换。
+        // ⭐ 原子写三步（与控制台练习 `SaveSystem.Save` 是【同一套配方】）：
+        //    ① 写临时文件 ② 整体替换 ③ 走完不留残渣
+        //
+        //    ⚠️ 为什么不能直接 `File.WriteAllText(SaveFilePath, json)`：
+        //       它是【先截断、再写】⇒ 中间任何一刻出事（断电 / 被杀进程 / 磁盘满），
+        //       存档就成半截 —— 而且【旧的也没了】。
+        //
+        //    ⭐ 为什么"替换"是原子的：同卷内它是 **rename**（文件级换指向），
+        //       不存在"写了一半"的中间态 ⇒ 要么旧档、要么新档。
+        //
+        //    ⚠️ 与控制台版的【唯一差别】（同一配方、两地 API 不同）：
+        //       控制台（net8.0）有 `File.Move(tmp, dest, overwrite: true)`，一行搞定；
+        //       本工程 `.NET Standard 2.0` 档位 ⇒ `File.Move` **只有两参重载**
+        //       （三参要 .NET Standard 2.1）⇒ 只能自己分支。
+        //       ⭐ 结论来自 `unity_reflect` 实测，不是凭记忆。
         string json = JsonConvert.SerializeObject(_data, Formatting.Indented);
-        File.WriteAllText(SaveFilePath, json);
-        Debug.Log($"[SaveManager] 已写档 {FileName} ⇒ {_data}");
+        File.WriteAllText(TempFilePath, json);                     // ① 写临时文件（同目录）
+
+        if (File.Exists(SaveFilePath))                             // ② 整体替换（两分支）
+            File.Replace(TempFilePath, SaveFilePath, null);        //    目标在 ⇒ 替换（backup 传 null = 不留备份）
+        else
+            File.Move(TempFilePath, SaveFilePath);                 //    第一次存档 ⇒ 直接搬过去
+
+        // ③ Move / Replace 都会把临时文件【消耗掉】⇒ 目录里不留残渣
+        Debug.Log($"[SaveManager] 已写档 {FileName}（原子）⇒ {_data}");
     }
 
     // ───────────────── 读档：三态 + 两条底线 ─────────────────
