@@ -2978,13 +2978,32 @@ SaveManager.cs   —— MonoBehaviour（不是单例）
    ├ OnDestroy()  ：退订
    ├ LoadFromDisk()：try { 读 + 解析 + 判 null } catch (FileNotFoundException) → NotFound
    │                 catch (… when IOException/UnauthorizedAccess/JsonException) → Corrupted
-   └ SaveToDisk() ：Serialize → WriteAllText（原子写待补）
+   └ SaveToDisk() ：Serialize → 写 tmp → 分支替换（**原子写**，10-13 落地）
 装配：把 SaveManager 挂到 GameManager 那个物体上（**组件，不是子物体**）+ 保存场景
 ```
 
-### 九、⏳ 待办（10-13 起）
+### 九、✅ 原子写落地（10-13）+ ⭐ 一处比配方更值钱的真实差异
 
-- **原子写**（与控制台练习 TODO 3 同一套配方）；
+**三步**（与控制台练习 `SaveSystem.Save` **同一套配方**）：① 写 tmp ② 整体替换 ③ 不留残渣。
+
+⭐ **同一个配方，两地 API 不一样**：
+
+| | 控制台（`net8.0`） | 本工程（`apiCompatibilityLevel` = `.NET Standard 2.0` 档） |
+|---|---|---|
+| `File.Move` 的重载 | ✅ **三参**：`Move(s, d, overwrite: true)` | ⚠️ **只有两参** —— 三参要 **.NET Standard 2.1** 才有 |
+| 因此写法 | 一行搞定，**不用分支** | ❌ 必须**自己分支**：目标在 ⇒ `File.Replace(tmp, dest, null)`；不在 ⇒ `File.Move(tmp, dest)` |
+| 怎么发现的 | —— | ⭐ 用 **`unity_reflect` 反射实测**（不靠记忆）：`File.Move` 只有 1 个重载、`File.Replace` 有 3 / 4 参两个 |
+
+⭐ 判据：
+
+> **"配方"可以跨环境复用，但「API 的签名」必须到目标环境去验。**
+> 验证手段 = **反射实测**，而不是"我在别处跑过"。
+
+⚠️ 另一条环境现象（10-13 实测，待进一步确认）：**外部写入脚本后，若 Unity 失焦，可能只被"导入"却不触发脚本编译**（`editor_state` 里外部改动被清、但无新编译）⇒ 动 Unity 前先让编辑器获得焦点，**并用反射（程序集里有没有那个成员）或控制台确认**，别拿"我写过文件了"当完成。
+
+### 十、⏳ 待办（10-13 起）
+
+- ⚠️ **Unity 侧编译 + Play 验证待补**（10-13 提交时编辑器失焦）—— 让 Unity 获得焦点 / `Ctrl+R`，然后看控制台 + 再 Play 一次（日志末尾应带「（原子）」）；
 - **让存档"用起来"**：HUD 显示 `BEST:<最高分>`（⚠️ 英文/数字）＋ 关卡进度；
 - **破纪录判定**：谁来判"这次是新纪录"（`HandleGameEnded` 里判 vs `ScoreManager` 自己判）。
 
