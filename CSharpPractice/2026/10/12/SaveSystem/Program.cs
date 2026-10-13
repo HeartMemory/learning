@@ -203,6 +203,7 @@ public static class SaveSystem
     //     判据：换个启动方式（`dotnet run` ↔ 双击 exe），它还指向**同一个文件**吗？
     //   · ⚠️ 别手拼 "/" 或 "\"（承 10-08：一律 `Path.Combine`）
     public static string SavePath => Path.Combine(AppContext.BaseDirectory, "save.json");
+    private static string TempPath => SavePath + ".tmp";
 
     // ─────────────────── TODO 2：读（三态 + 两条底线）───────────────────
     //   契约：
@@ -244,13 +245,18 @@ public static class SaveSystem
         }
     }
 
-    // ──────────────────── TODO 3：写（原子写）· ⏳ 顺延 ────────────────────
-    //   📌 进度（10-12 收工前）：**TODO 1 / TODO 2 已完成并全绿**
-    //      （⓪ 落点 3 绿 / ②③④⑤ 全绿，`dotnet build` = 0 警告 0 错误）
-    //      **本项顺延到 10-13 开局补（约 15 分钟）** —— 骨架照下面四条走。
-    //   步骤：① 先把内容写进一个**临时文件** ② 成功之后再把它**整体替换**目标文件
-    //   ⚠️ 去查 / 实测一件事：`File.Replace` 在【目标文件不存在】时会怎样？
-    //      —— 这决定你"第一次存档"要不要走另一支（或者干脆换个 API）
-    //   判据：① 走完目标文件 = 本次内容 ② 不留临时文件 ③ 中途失败时旧档**不被破坏**
-    public static void Save(SaveData data) => throw new NotImplementedException("TODO 3：原子写");
+    // ──────────────── TODO 3：写（原子写）· ✅ 10-13 完成 ────────────────
+    //   📌 TODO 1 / 2 / 3 **全部完成**（⓪②③④⑤⑥⑦ 全绿；`dotnet build` = 0 警告 0 错误）
+    //   ✅ 实测结论：`File.Replace` **要求目标已存在**（不存在抛 `FileNotFoundException`），
+    //      而 `File.Move(s, d, overwrite: true)` 两种都行 ⇒ 选 **Move 一行搞定、不用分支**。
+    //   ⭐ 三步：① 写临时文件 ② 整体替换 ③ 不留残渣（Move 会把 source 消耗掉）
+    //   ⭐ 判据③（中途失败旧档不被破坏）**判题器测不了** ⇒ 用手工探针验过：
+    //      在替换前插 `throw` → **读回** `save.json` → 内容一字未变。
+    //   ⚠️ 复用到 Unity 时要改：那边 `.NET Standard 2.0` 档位 **没有三参 `File.Move`**
+    //      ⇒ 必须自己分支（`Replace` / `Move`），详见 Unity 笔记第 26 章
+    public static void Save(SaveData data)
+    {
+        File.WriteAllText(TempPath,JsonSerializer.Serialize<SaveData>(data));
+        File.Move(TempPath,SavePath,true);
+    }
 }
