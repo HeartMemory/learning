@@ -120,6 +120,9 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        // 10-17：游戏结束后直接 return（读权威状态，不复制、不订阅）
+        if (GameManager.Instance.IsGameOver) return;
+
         // TODO ③ 读 Move → 映射到世界坐标
         //    判据问题：Move 是 Vector2（x = 左右、y = 前后），世界是 Vector3 ——
         //              哪个分量该落到 z 上？为什么？（想清楚"屏幕里往前"是世界的哪个轴）
@@ -163,6 +166,9 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        // 10-17：游戏结束后直接 return（读权威状态，不复制、不订阅）
+        if (GameManager.Instance.IsGameOver) return;
+
         // ── ⑩ 接地判定（10-16）：每个物理步只问一次，结论存进 `_isGrounded` ──
         _isGrounded = CheckGrounded();
 

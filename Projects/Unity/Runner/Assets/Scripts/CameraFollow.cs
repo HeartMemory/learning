@@ -1,5 +1,4 @@
-﻿using Unity.VisualScripting;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 // ══════════════════════════════════════════════════════════════
@@ -113,7 +112,12 @@ public class CameraFollow : MonoBehaviour
 
     private void LateUpdate()
     {
+        // 10-17：游戏结束后直接 return（读权威状态，不复制、不订阅）
+        // ⭐ 放读 Look 之前 ⇒ rotation + position 一起冻住（修"结束后视角还能转"）
+        if (GameManager.Instance.IsGameOver) return;
+
         // ── 前半：视角 / 距离 = 玩家直控（**零阻尼**）──────────────────────
+
         // TODO ④ 读 Look → 累加 yaw / pitch —— 你已完成 ✅
         //    判据：这一格里为什么**绝不能**出现 `Time.deltaTime` 或 SmoothDamp？
         //    实测（Play 里自己定）：鼠标上推 ⇒ 期望"抬头"；若反了 ⇒ 把 `-=` 改成 `+=`
