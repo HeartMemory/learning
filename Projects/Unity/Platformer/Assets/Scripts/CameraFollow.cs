@@ -31,8 +31,8 @@ public class CameraFollow : MonoBehaviour
 
     [Header("手感")]
     [SerializeField] private float smoothTime = 0.15f;     // 阻尼：追上目标约需几秒（越小越硬跟）
-    [SerializeField] private float deadZoneX = 0.5f;       // 死区：目标与相机差得比它小 ⇒ 相机不动
-    [SerializeField] private float deadZoneY = 0.5f;
+    [SerializeField] private float deadZoneX = 2f;       // 死区：目标与相机差得比它小 ⇒ 相机不动
+    [SerializeField] private float deadZoneY = 2f;
     [SerializeField] private float lookAheadX = 2f;        // 前瞻：全速时最多朝运动方向多看几格
     [SerializeField] private float lookAheadAtSpeed = 6f;  // 达到满前瞻所需速度（= moveSpeed）
 

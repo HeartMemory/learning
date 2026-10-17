@@ -1288,8 +1288,8 @@ MonoBehaviour:
   maxX: 30.3
   yBias: 2
   smoothTime: 0.15
-  deadZoneX: 0.5
-  deadZoneY: 0.5
+  deadZoneX: 2
+  deadZoneY: 2
   lookAheadX: 2
   lookAheadAtSpeed: 6
 --- !u!1 &647986071
