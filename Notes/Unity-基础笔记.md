@@ -3510,6 +3510,74 @@ Gizmos.DrawLine(origin, origin + Vector3.down * groundCheckDistance);  // = Rayc
 
 ---
 
+## 第 31 章 · Runner 第 3 步：障碍生成 · 对象池 · 撞障碍结束（10-17）
+
+### 一、对象池换官方 `UnityEngine.Pool.ObjectPool<T>`（查证结论）
+
+**查证**（两条来源交叉）：官方 Manual `performance-reusable-code` + Scripting Reference，均确认 Unity 2021+ 内置 `UnityEngine.Pool`、官方推荐。手写 `Queue`（Breakout 那套）已会、学习增量低 ⇒ Runner 换官方 API。
+
+**四个回调（谁、什么时候被调）**：
+
+| 回调 | 类型 | 什么时候被调 | 本例 |
+|---|---|---|---|
+| `Create` | `Func<Obstacle>` | **只有池空时**（`Get()` 发现没库存） | `Instantiate(prefab)` |
+| `OnGet` | `Action<Obstacle>` | **每次 `Get()`** | `SetActive(true)` |
+| `OnRelease` | `Action<Obstacle>` | **每次 `Release()`** | `SetActive(false)` |
+| `OnDestroy` | `Action<Obstacle>` | **归还时池已满（≥ `maxSize`）** | `Destroy(gameObject)` |
+
+**三个配置**：
+
+| 配置 | 用 | 默认 |
+|---|---|---|
+| `collectionCheck` | 防同一对象还两次（`Release` 时 `Stack.Contains` 遍历 + 命中抛 `InvalidOperationException`） | true |
+| `defaultCapacity` | 内部 `Stack` 初始容量（⚠️ **不是预分配**） | 10 |
+| `maxSize` | 池上限（超过才真销毁） | 10000 |
+
+⭐ **最易误解：`defaultCapacity` ≠ 预分配** —— 它是容器初始容量，对象是**懒创建**的（`Get` 池空才 `new` 一个）。摆 8 个障碍 = `Instantiate` 8 次，不是 20 次。🪞 对比 Breakout `Preload()`（主动一次造满 32 块）= **预分配**，两条不同策略。
+
+### 二、程序化摆障碍：谁生成谁摆放
+
+- `ObstacleSpawner.Start()` 循环 `_pool.Get()` + 设 `transform.position`（第 i 个在 `z = spawnStartZ + i * spawnSpacing`）。
+- ⭐ **职责判据：谁生成、谁摆放** —— `Obstacle` 只答"被撞怎么办"（`OnCollisionEnter` 认玩家 → 上报），**不答"我该待在哪"**（位置是算法算的，只有生成者知道全局布局）。
+- 数学底层 = **参数方程** `P(i) = P0 + i·step·dir`（方向写成单位向量，把"往哪走"和"走多远"分开）。
+
+### 三、撞障碍结束：哨兵 → 裁判 → 停手
+
+- `Obstacle.OnCollisionEnter`（哨兵，`GetComponent<PlayerController>() != null` 认玩家）→ `GameManager.NotifyPlayerLost()`（裁判，幂等锁）→ 置 `_isGameOver = true`。
+- **停手 = 玩家/相机每帧读 `GameManager.Instance.IsGameOver`**，命中就 `return`（`Update` / `FixedUpdate` / `LateUpdate` 开头各一行）。
+- 障碍用**实体碰撞体**（非 Trigger）：玩家 dynamic Rigidbody 撞 static Collider ⇒ 双方都收 `OnCollisionEnter`，物理上"真撞"。
+
+### 四、⭐⭐ 两条架构判据（今天最值钱）
+
+**① 一次性响应用事件，持续条件读状态**
+
+| 需求 | 例子 | 该用 |
+|---|---|---|
+| 状态一变，要做**一件事** | 结算面板弹出、结束音效 | **事件订阅** |
+| **每帧**都要判断这个状态 | 玩家停手、相机停视角 | **直接读状态** |
+
+- "停手"是持续条件 ⇒ 读 `GameManager.Instance.IsGameOver`，**不复制状态、不订阅**（复制 = 违反「同一个状态只能有一个家」）。
+- `OnGameOver` 事件留着，给未来"一次性动作"（结算面板/音效）订阅。
+
+**② `Time.timeScale = 0` 只冻结"时间"，冻结不了"输入 + 直接赋值"**
+
+- 视角那一路 `_yaw += delta.x * lookSensitivity` **不乘 deltaTime**（零阻尼、玩家直控）⇒ 逃过 timeScale 冻结 ⇒ 结束后还能转。
+- 位置那一路 `SmoothDamp` 依赖 `Time.deltaTime` ⇒ 被冻住 ⇒ 症状 = "跟随没了、原地转"。
+- ⭐ 判据：**timeScale 冻结的是"依赖 deltaTime 的时间"，不是"依赖输入的直接赋值"**。
+
+### 五、验证读数（收工实测）
+
+| 项 | 结果 |
+|---|---|
+| 撞障碍结束 | Play 手动实测：撞障碍 → 玩家停 + 视角不再转 ✓ |
+| 编译 | 三个脚本 read_lints 0 error |
+
+### 六、今天没做的（指向回访清单）
+
+- 障碍走**物理碰撞**（Default 层 + `OnCollisionEnter`），**没动层碰撞矩阵**——做 `Pickup`（金币，要"穿过"）时再配层矩阵（回访清单 🔴 真账区）。
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
@@ -3567,7 +3635,7 @@ Gizmos.DrawLine(origin, origin + Vector3.down * groundCheckDistance);  // = Rayc
 - [ ] ⭐ **关卡布局【数据化】（10-09 记 · 真实欠账）**：本关的"平台区间表"只活在编辑器里跑过的一段代码里（**没落成脚本 / 资产**）⇒ 下次改设计得从头写一遍。落法：① 布局数据（每层 `{起x, 止x, 格y}`）写成 **ScriptableObject** 或并进 `levels.json` ② 一个**生成器脚本**（`[MenuItem]` / `ContextMenu` 触发）⇒ 关卡设计成为**可版本控制的数据**，改设计 = 改数字重刷（承第 23 章"派生数据不该手填"、第 24 章第二节）
 - [ ] ⭐ **`Player` 提成 `Player.prefab`（10-11 记 · 真实欠账）**：⚠️ `PlayerController.gameManager` 是**场景引用**，Prefab **存不了** ⇒ 提成后**三关各要重拖一次**（`groundCheck` / `visual` / `animator` 是 Prefab 内部引用，能存）。做完即"改一次三关生效"——判据：**三个场景要一模一样的东西就该是 Prefab**
 
-- [ ] ⭐ **Runner（3D）的层与层碰撞矩阵（10-14 记）**：3D 物理有**自己的**层碰撞矩阵（与 Platformer 那套 2D 矩阵是两套）⇒ 做障碍 / 掉落物（10-17）前必须先定层（`Player` / `Obstacle` / `Pickup`），否则"**撞上**"与"**穿过**"两种需求都没法表达；⚠️ 会动 `ProjectSettings/TagManager.asset` ⇒ 走"保存项目 + 隐私自查 + 提交设置"。**触发判据 = 做障碍生成那天**；**落地判据 = 层建好 + 矩阵勾完 + 能跑通一局** · 📌 **10-16 进展**：`Ground` 层（索引 6）已建并挂到 `Ground` 物体（探针用它）⇒ **剩"矩阵勾选"与 `Obstacle` / `Pickup` 的规划**
+- [ ] ⭐ **Runner（3D）的层与层碰撞矩阵（10-14 记）**：3D 物理有**自己的**层碰撞矩阵（与 Platformer 那套 2D 矩阵是两套）⇒ 做障碍 / 掉落物（10-17）前必须先定层（`Player` / `Obstacle` / `Pickup`），否则"**撞上**"与"**穿过**"两种需求都没法表达；⚠️ 会动 `ProjectSettings/TagManager.asset` ⇒ 走"保存项目 + 隐私自查 + 提交设置"。**触发判据 = 做障碍生成那天**；**落地判据 = 层建好 + 矩阵勾完 + 能跑通一局** · 📌 **10-16 进展**：`Ground` 层（索引 6）已建并挂到 `Ground` 物体（探针用它）⇒ **剩"矩阵勾选"与 `Obstacle` / `Pickup` 的规划** · 📌 **10-17 进展**：障碍走**物理碰撞**（Default 层 + `OnCollisionEnter`，撞上就结束），**未动层矩阵**；层矩阵留到做 `Pickup`（要"穿过"）时再配
 - [ ] **地面探针从"单点"升级（10-16 记 · 真实欠账）**：现在是**一个球 + 一条向下射线**（起点 = 胶囊轴心正下方 + 抬 2 cm）。站在**窄平台 / 斜坡边缘 / 台阶角**时可能"半只脚悬空就判没接地"⇒ 表现为**突然跳不起来**（不报错）。**触发判据 = 跑酷地形（10-17 起）出现窄平台 / 斜坡 / 台阶时**；**落地判据 = 边缘上能正常起跳**，手段任选：三条探针（左中右）/ `Physics.CapsuleCast` 向下扫 / 球形探针加大半径并配合坡度校验。见本册第 30 章第八节
 
 ### 🧪 实验项（等触发）
