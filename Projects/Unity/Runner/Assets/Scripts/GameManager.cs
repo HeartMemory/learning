@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;   // SceneManager（重开要用）
 
 // ══════════════════════════════════════════════════════════════
 //  GameManager —— 跑酷裁判（唯一出口）
@@ -46,6 +47,26 @@ public class GameManager : MonoBehaviour
         {
             return; // 幂等锁：已经结束的游戏不再重复结算
         }
-        _isGameOver = true;
+        _isGameOver = true;          // ① 先上锁（顺序不能换）
+
+        // ② 再改状态：冻结世界
+        //    只加"读状态停手"（10-17 的做法）治不了"结束后还在滑/滚/掉"：
+        //    停手 = 不再写速度，但**物理引擎照跑**、刚体速度还在 ⇒ 惯性把人推走。
+        //    `timeScale = 0` 才是"冻结世界"那一刀；两把刀互补，缺一不可。
+        Time.timeScale = 0f;
+
+        // ③ 最后播副作用：存档（RunnerSaveManager）与结算面板（RunnerDeathPanel）都订这里
+        //    ⚠️ 10-19 之前【这一行是缺的】—— 事件声明了、谁都没 Invoke ⇒ 订阅者永远收不到
+        OnGameOver?.Invoke();
+    }
+
+    // ── 重开一局（结算面板的 RESTART 按钮调它）──
+    //    🪞 照 Platformer/GameManager.cs 的 Restart()：两行、顺序不能反
+    public void Restart()
+    {
+        // ⚠️ 必须先还 timeScale = 1f，再 LoadScene ——
+        //    否则新场景一开场就是【冻结】的（Breakout 09-26 踩过）
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

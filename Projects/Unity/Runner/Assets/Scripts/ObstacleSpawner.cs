@@ -44,6 +44,17 @@ public class ObstacleSpawner : MonoBehaviour
     [SerializeField] private int spawnCount = 8;           // 摆几个障碍
     [SerializeField] private float spawnStartZ = 6f;       // 第一个障碍的 z（玩家前方）
     [SerializeField] private float spawnSpacing = 4f;      // 相邻障碍间距
+    // ⭐ 10-19 加：纵坐标也做成面值（与 CoinSpawner 的同名字段对照着调）
+    //    障碍是 1×1×1 的 Cube ⇒ y = 0 时中心贴地（露出半米）；想让障碍更高就调大它
+    [SerializeField] private float spawnHeight = 0f;       // 障碍的 y（0 = 底面贴地）
+
+    [Header("层级归置（两个槽都可留空 = 不归置，功能不受影响）")]
+    // ⭐ 池只管"复用"，不认父子关系 ⇒ 父子归置放在 Get / Release 两个回调里做，
+    //    调用点（Start 的循环）就永远是干净的：Get → 设位置 → 完事
+    [SerializeField] private Transform obstacleRoot;      // 运行时父物体（让 Hierarchy 里能一眼分清"障碍 / 金币 / 掉落物"）
+    [SerializeField] private Transform poolRoot;          // 回收站：归还时挂回来（在池里躺着的别散在场景根级）
+    // ⚠️ 接线判据：这两个物体**缩放必须是 (1,1,1)、不许旋转** ——
+    //    父物体的缩放会【乘法】传给子物体（父 2 倍 ⇒ 障碍也 2 倍大），旋转会让障碍跟着歪
 
     private IObjectPool<Obstacle> _pool;
 
@@ -71,14 +82,15 @@ public class ObstacleSpawner : MonoBehaviour
         {
             Obstacle obstacle = _pool.Get();
             float zPosition = spawnStartZ + i * spawnSpacing;
-            obstacle.transform.position = new Vector3(0f, 0f, zPosition);
+            obstacle.transform.position = new Vector3(0f, spawnHeight, zPosition);   // ⭐ y 改成可调面值
         }
     }
 
     private Obstacle CreateObstacle()
     {
         // TODO ③：真 new 一个实例（Instantiate(obstaclePrefab)）
-        return Instantiate(obstaclePrefab);
+        //   ⭐ 出生就挂在回收站：否则新实例会在【场景根级】冒一帧，随后才被搬到别处
+        return Instantiate(obstaclePrefab, poolRoot);
     }
 
     private void OnGetFromPool(Obstacle obstacle)
@@ -86,12 +98,17 @@ public class ObstacleSpawner : MonoBehaviour
         // TODO ④：取出时激活（obstacle.gameObject.SetActive(true)）
         if (obstacle == null) return;
         obstacle.gameObject.SetActive(true);
+        // ⭐ 顺序 与 Start 里的坐标账配合：这里只管"改归属"，
+        //    `worldPositionStays: true` = 别因为换爹把世界位置也改了；
+        //    真正的摆位由 Start 循环紧接着写 transform.position 完成
+        obstacle.transform.SetParent(obstacleRoot, worldPositionStays: true);
     }
 
     private void OnReleaseToPool(Obstacle obstacle)
     {
         // TODO ⑤：归还时停用（obstacle.gameObject.SetActive(false)）
         if (obstacle == null) return;
+        obstacle.transform.SetParent(poolRoot, worldPositionStays: true);   // 先收进回收站
         obstacle.gameObject.SetActive(false);
     }
 

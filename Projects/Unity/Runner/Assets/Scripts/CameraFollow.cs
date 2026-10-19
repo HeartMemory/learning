@@ -108,6 +108,30 @@ public class CameraFollow : MonoBehaviour
 
         // TODO ③ 光标锁定 —— 你已完成 ✅
         Cursor.lockState = CursorLockMode.Locked;
+
+        // ⭐ 10-19 补：**锁了就必须有人解** —— 否则结束时鼠标被藏在屏幕中心，
+        //    结算面板上的 RESTART 根本点不到（症状 = "结束了但没鼠标"）。
+        //    判据：**谁加锁谁解锁** —— 锁在本类 Start，解也归本类（一个状态一个家）。
+        //    用现成事件：`OnGameOver` 是裁判（GameManager）宣布"结束"的唯一出口。
+        if (GameManager.Instance != null)
+            GameManager.Instance.OnGameOver += ReleaseCursor;
+        else
+            Debug.LogError("CameraFollow 找不到 GameManager：结束时鼠标不会被释放（点不到重开按钮）", this);
+    }
+
+    private void OnDestroy()
+    {
+        // 订阅者自己负责退订（承 09-29 事件那课）
+        if (GameManager.Instance != null)
+            GameManager.Instance.OnGameOver -= ReleaseCursor;
+    }
+
+    // 交还鼠标：显示出来 + 取消锁定（之后 UGUI 按钮才可点）
+    // ⚠️ 重开走的是 LoadScene ⇒ 新场景的 CameraFollow.Start 会重新上锁，不必在这里操心
+    private void ReleaseCursor()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     private void LateUpdate()

@@ -3578,6 +3578,110 @@ Gizmos.DrawLine(origin, origin + Vector3.down * groundCheckDistance);  // = Rayc
 
 ---
 
+## 第 32 章 · Runner 第 4 步：金币 · 计分 · 最高分存档 · 结算闭环（10-19 · Block 4 第 8 天）
+
+> 本步的原则只有一条：**能复用的全部复用，2D → 3D 只换 API**。下面每个子系统都标注了"抄的是谁、改了什么"。
+
+### 一、复用对照表
+
+| 新子系统 | 复用来源 | 实际改动 |
+|---|---|---|
+| 金币 `Coin` | 平台跳跃 `Coin.cs` | `OnTriggerEnter2D(Collider2D)` → **`OnTriggerEnter(Collider)`**；门卫改组件判定（见三） |
+| 计分 `ScoreManager` | 平台跳跃 `ScoreManager.cs` | 单例 + **唯一入口改分** + **脏检查重绘** 照搬；多一个 `HighestScore` 只读出口 |
+| 存档 `RunnerSaveManager` + `RunnerSaveData` | 平台跳跃 `SaveManager` / 控制台存档 | `persistentDataPath` + **三态** + **原子写** 照搬；只换落点文件名 |
+| 结算面板 `RunnerDeathPanel` | 平台跳跃 `DeathPanel.cs` | 砍掉"赢"那一整组，只留 `GAME OVER` + RESTART |
+| 重开 | 打砖块 `Restart()` | `timeScale = 1f` **然后** `LoadScene`（顺序不能反） |
+| 金币生成 `CoinSpawner` | 障碍 `ObstacleSpawner.cs` | **同一个四回调对象池 + 同一个摆放循环**，差别只有**纵坐标** |
+
+### 二、对象池的父子归置（`SetParent` 放哪）
+
+```
+Create  → Instantiate(prefab, poolRoot)        出生就进回收站（否则会在场景根级冒一帧）
+Get     → SetActive(true) → SetParent(activeRoot, worldPositionStays: true)
+Release → SetParent(poolRoot, worldPositionStays: true) → SetActive(false)
+```
+
+- ⭐ `worldPositionStays` **必须显式写 `true`**：要的是"改归属、不改世界位置"
+- ⚠️ 父物体**缩放必须 (1,1,1)、不许旋转** —— 缩放是**乘法传播**（父 2 倍 ⇒ 子也 2 倍大），旋转会带着子物体歪
+- 判据：池只管"复用"，**不认父子关系** ⇒ 归置放在两个回调里做，`Start` 的摆放循环就永远干净（`Get` → 设位置 → 完事）
+
+### 三、金币：同一个池，只换纵坐标
+
+- 与障碍**共用同一组** `spawnCount / spawnStartZ / spawnSpacing` ⇒ 金币正好长在每个障碍的**正上方**（`spawnHeight` 抬起来）
+- 表现：`transform.Rotate(Vector3.up, 速度 * deltaTime, Space.World)` 绕**世界 Y** 自转 + 正弦上下浮动（竖着的扁长方体 ⇒ 经典"硬币转起来"的观感）
+- ⭐⭐ **与池配合的唯一陷阱（今天最值钱的一条）**：
+  `Get()` 的顺序是 `SetActive(true)`（**触发 `OnEnable`**）→ **然后**才由 Spawner 设 `position`。
+  ⇒ 若在 `OnEnable` 里记录"基准高度"，记到的是**上一轮的旧位置** ⇒ 浮动会围着错误的高度跳。
+  ✅ 解法 = **懒初始化**：第一帧 `Update` 才记 `_base`，`OnDisable`（归还池）时把标记清掉。
+- ⚠️ 门卫别照抄层判定：本工程**没有 `Player` 层**，照抄会得到"**永远吃不到、且控制台一声不响**"。改用 `other.GetComponent<PlayerController>() != null`（触发器回调只触发一次，省那一次 `GetComponent` 无意义）
+
+### 四、一局结束：四段链（哨兵 → 裁判 → 两个订阅者）
+
+```
+Obstacle（哨兵，OnCollisionEnter）
+   → GameManager.NotifyPlayerLost()      ← 唯一出口
+        ① 幂等锁（已经结束就 return）
+        ② _isGameOver = true
+        ③ Time.timeScale = 0f             ← 冻结世界
+        ④ OnGameOver?.Invoke()            ← 广播（副作用放最后）
+   → RunnerSaveManager（订阅者：合并最高分 → 原子写）
+   → RunnerDeathPanel（订阅者：面板渐入）
+```
+
+⭐⭐ **今天最隐蔽的一个坑**：`OnGameOver` 事件**声明了、但从来没人 `Invoke`** ⇒ 两个订阅者**永远收不到**。
+症状 = **存档文件从不出现，且控制台一声不响**（最坏的一类失败：不报错、只是没发生）。
+⇒ 判据：**"事件声明了" ≠ "事件会响"** —— 写完 `event` 要立刻问一句"谁负责 `Invoke`？"
+
+### 五、"停手" ≠ "冻结"（今天最大的认知修正）
+
+| 刀 | 管什么 | 缺了会怎样 |
+|---|---|---|
+| 在 `Update` / `FixedUpdate` 开头 `if (IsGameOver) return;` | **不再写**：输入、速度指令、相机 | 结束后视角还能转（10-17 那个 bug） |
+| `Time.timeScale = 0f` | **物理引擎别跑了**：重力、惯性、碰撞推进 | 撞上后角色继续滑 / 滚 / 掉（今天这个 bug） |
+
+⭐ 结论：**两把刀互补，缺一不可**。当年只用 `timeScale` 治不住"视角还能转"（鼠标像素增量不乘 `deltaTime`，`timeScale` 管不着它）；今天只用"读状态停手"也治不住"还在滑"（物理照跑、刚体速度还在）。
+
+### 六、结算面板：渐入 + 可点
+
+| 要点 | 做法 | 判据 |
+|---|---|---|
+| 渐入 | `CanvasGroup.alpha` 从 0 涨到 1（`Show()` 里先归零 → `SetActive(true)` → `Update` 往上涨） | ⚠️ 必须用 **`unscaledDeltaTime`**：`timeScale = 0` 时 `Time.deltaTime` **恒等于 0** ⇒ 用它会永远淡不进来 |
+| 为什么用 `CanvasGroup` | 一块面板一起淡（文本 / 按钮不用逐个改色） | 子物体多时这是唯一省事的做法 |
+| 为什么不用 Animator | 0.3 秒的一次性淡入，不值得引入 `.anim` + `.controller` + `Update Mode` 约束 | 多段 / 循环 / 带曲线事件的表现才轮到 Animator |
+| 按钮可点 | UGUI **不受 `timeScale` 影响** | 所以"世界冻结"与"结算界面可交互"能并存 |
+| ⚠️ **交还鼠标** | `Cursor.lockState = None` + `Cursor.visible = true` | `Locked` 模式鼠标被藏在屏幕中心 ⇒ **点不到按钮**。锁在 `CameraFollow.Start`，解开也归它 —— **谁加锁谁解锁**（用现成的 `OnGameOver` 触发，重开走 `LoadScene` ⇒ 新场景自动重新上锁） |
+
+### 七、存档：三态 + 原子写（实测）
+
+| 项 | 值 |
+|---|---|
+| 落点 | `Application.persistentDataPath`（Windows = `C:\Users\<用户>\AppData\LocalLow\<公司名>\<项目名>`） |
+| 三态 | `Loaded` / `NotFound`（第一次玩 = **正常态**）/ `Corrupted`（坏档，要能区分） |
+| 原子写 | 写 `.tmp` → `File.Replace`（目标在）/ `File.Move`（第一次）⇒ 要么旧档要么新档 |
+| 实测 | 首次 `读档结果 = NotFound`；一局结束 `已写档 runner-save.json（原子）⇒ v1｜最高分 30｜总局数 7` |
+
+⚠️ 两个认知：
+
+1. **存档永远落在 C 盘，跟工程在哪个盘无关** —— 这是"保证可写 + 重装不丢 + 多用户隔离"唯一同时成立的位置；`AppData\LocalLow` 还是**隐藏目录**（资源管理器里翻不到，要用 `Win + R` 粘路径）
+2. `[SerializeField]` 与 `SaveVersion` 同理：**加字段时给初始值** ⇒ 旧存档缺这个键时保持初始值，**一行迁移代码都不用写**
+
+### 八、验证读数
+
+| 项 | 结果 |
+|---|---|
+| 编译 | `Assembly-CSharp.dll` 时间戳 > 源码时间戳，控制台 **0 error** |
+| 金币 | Play 实测：悬在障碍正上方、自转 + 浮动 ✓ |
+| 结算 | 撞障碍 → 面板渐入 + 世界冻结 + 鼠标交还 + RESTART 可点 ✓ |
+| 存档 | 控制台 `NotFound → 已写档(最高分 30 / 总局数 7)` ✓ |
+
+### 九、本章的通用判据（三条，跨项目可用）
+
+1. **"事件声明了" ≠ "事件会响"** —— 写完 `event` 立刻问"谁 `Invoke`"
+2. **"停手" ≠ "冻结"** —— 一个管"谁在写"，一个管"引擎还跑不跑"
+3. **跨维度复用只换 API，不换结构** —— 2D→3D 换的是 `OnTriggerEnter2D` → `OnTriggerEnter(Collider)`，配方（谁上报、谁裁决、谁订阅）一个字都不用改
+
+---
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
