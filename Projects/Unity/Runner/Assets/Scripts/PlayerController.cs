@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;                      // 🆕 10-20：OnJumped / OnLanded 用的 Action
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 // ══════════════════════════════════════════════════════════════
@@ -58,6 +59,19 @@ using UnityEngine.InputSystem;
 // ══════════════════════════════════════════════════════════════
 public class PlayerController : MonoBehaviour
 {
+    // ══════════════════════════════════════════════════════════════
+    //  🆕 10-20：只读出口 + 两个事件（给 PlayerAudio 用）
+    //    ⭐ 判据：**数据只有本类能改，外面只能读或订** ——
+    //       属性是只读的（没有 set），事件只 Invoke 不给外部触发
+    //    · IsGrounded / MoveInput = 【状态】→ 走路音每步读一次（它要的是"现在还在走"）
+    //    · OnJumped / OnLanded   = 【事件】→ 音效只在发生的那一瞬间响一次
+    //    （同一份数据，两种消费方式；这条分界承 PlayerAudio 判据③）
+    // ══════════════════════════════════════════════════════════════
+    public bool IsGrounded => _isGrounded;
+    public Vector3 MoveInput => _input;
+    public event Action OnJumped;
+    public event Action OnLanded;
+
     [Header("移动")]
     [SerializeField] private float moveSpeed = 6f;   // 米/秒；面值放检查器可调
 
@@ -83,6 +97,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 _input;       // ⭐ 跨时钟的桥：Update 写、FixedUpdate 读
     private bool _isGrounded;     // 本物理步的接地结论（FixedUpdate 里算一次，别每处重问）
     private bool _jumpRequested;  // ⭐ 第二个桥（边沿版）：Update 写、FixedUpdate 用掉并清
+    private bool _wasGrounded;        // 🆕 10-20：上一步的接地结论（用来判"落地"这个边沿）
+    private bool _groundInitialized;  // 🆕 10-20：第一步只记录、不触发（开局"站在地上"不是"刚落地"）
     [SerializeField] private CameraFollow cameraFollow;   // 10-15：移动输入的"参考系"（检查器里拖 Main Camera）
 
     private void Awake()
@@ -171,6 +187,16 @@ public class PlayerController : MonoBehaviour
 
         // ── ⑩ 接地判定（10-16）：每个物理步只问一次，结论存进 `_isGrounded` ──
         _isGrounded = CheckGrounded();
+
+        // ── 🆕 10-20【落地事件】：悬空 → 接地 的那一步 = "落地" ──
+        //   ⭐ 3D 里没有 2D 那套碰撞回调能白拿，"落地"只能自己用【边沿】造出来
+        //   ⚠️ `_groundInitialized` 这一道闸是必须的：
+        //      开局第一步本来就在地上，`_wasGrounded` 的默认值是 false
+        //      ⇒ 不挡的话，进入游戏的第一帧就会"咚"一声（把"已经在场"误报成"刚落地"）
+        //   ⭐ 判据：**"状态成立" ≠ "状态刚刚变成立"** —— 缺了上一次的快照就分辨不出两者
+        if (_groundInitialized && _isGrounded && !_wasGrounded) OnLanded?.Invoke();
+        _wasGrounded = _isGrounded;
+        _groundInitialized = true;
 
         // ── ⑫ 消费跳跃意图（10-16）：用掉就清，不管成功没成功 ──
         //    ⭐ 三件事的顺序不能换：**先算接地 → 再决定跳 → 最后清意图**
@@ -324,6 +350,10 @@ public class PlayerController : MonoBehaviour
         Vector3 v = _rb.linearVelocity;
         v.y = jumpSpeed;
         _rb.linearVelocity = v;
+
+        // 🆕 10-20：跳成功之后才广播（放在"真正改了速度"之后 = 只报已经发生的事实）
+        //   ⚠️ `?.Invoke()` 而非 `Invoke()`：没人订阅时直接返回，不抛空引用
+        OnJumped?.Invoke();
     }
 
     // TODO ⑬ 【看得见】把探针画出来（只在选中该物体时画，别污染整个场景视图）

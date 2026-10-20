@@ -19,6 +19,14 @@ public class ScoreManager : MonoBehaviour
     [SerializeField] private TMP_Text scoreText;
     [SerializeField] private int scorePerCoin = 10;   // ⭐ 分值归计分员管（"一枚几分"是规则，不是金币的属性）
 
+    // ── 🆕 10-20【金币音】为什么挂在计分员身上，而不挂在金币身上 ──
+    //   金币吃完会立刻 `SetActive(false)` 归还对象池；而**物体被禁用，其上的 AudioSource 会被就地掐断**
+    //   ⇒ 声音只响半截、或者根本听不见（"吃到了但没声音"这种最难查的症状）
+    //   ⭐ 判据：**声音的生命周期，不能依附于"即将被停用"的物体**
+    //   ⇒ 谁活得久，谁播（ScoreManager 是常驻单例）
+    [Header("音效（金币音由本类代播：常驻对象才扛得住）")]
+    [SerializeField] private AudioSource coinSfx;
+
     private int _coins;
     private int _score;
     private int _highest;          // 历史最高（来自存档，只升不降）
@@ -47,6 +55,14 @@ public class ScoreManager : MonoBehaviour
             enabled = false;
             return;
         }
+
+        // ⚠️ 金币音缺了【只报不停手】：音效是表现层，缺了不该把"计分"一起拖垮
+        //    （与 PlayerAudio 那边 enabled = false 的差别就在这儿：那边停了就彻底没声音，这边停了连分都没了）
+        if (coinSfx == null)
+        {
+            Debug.LogError("ScoreManager 的 coinSfx 槽是空的：吃金币没声音（计分照常）", this);
+        }
+
         Redraw();
     }
 
@@ -62,6 +78,26 @@ public class ScoreManager : MonoBehaviour
         _coins += amount;
         _score += amount * scorePerCoin;
         Redraw();
+        PlayCoinSfx();
+    }
+
+    // ── 🆕 金币音（带节流）──
+    //   ⚠️ 为什么要节流：金币是**程序化摆放、可能成串**，
+    //      相邻两枚在同一帧/相邻帧被吃到时，PlayOneShot 会把同一个波形**叠在一起**
+    //      ⇒ 振幅相加超过 ±1 就被削波 = "啪"的一声爆音（承 09-26 那次削波刺耳的教训）
+    //   ⭐ 判据：**同一个音效的并发数要有人管** —— 要么限频，要么留够时间隔开
+    //   ⚠️ 用 `Time.unscaledTime` 而不是 `Time.time`：结算时 timeScale = 0，
+    //      用 time 的话节流窗口会被"冻住"（永远算作"刚播过"或"过了很久"，两种都错）
+    private float _lastCoinSfxTime = -1f;
+    private const float CoinSfxCooldown = 0.05f;
+
+    private void PlayCoinSfx()
+    {
+        if (coinSfx == null) return;
+        if (Time.unscaledTime - _lastCoinSfxTime < CoinSfxCooldown) return;
+
+        _lastCoinSfxTime = Time.unscaledTime;
+        coinSfx.PlayOneShot(Sfx.Coin());
     }
 
     // ── 唯一入口②：存档读完档后把最高分推进来（只升不降，幂等）──
