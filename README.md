@@ -12,9 +12,14 @@ Learning/
 ├── Projects/          # 里程碑成品（按技术栈分大类）
 │   ├── CSharp/        #   C# 完成的工具/项目（如 Calculator 循环菜单版）
 │   └── Unity/         #   Unity 游戏（第 4 周起）
+├── UnityPractice/     # Unity 技术练习工程（与 CSharpPractice 对称；不占成品编号）
 ├── Notes/             # 每日复盘（年/月/日：YYYY/MM/DD.md）+ 错题本 + C#/Unity 基础笔记
 └── README.md          # 本文件
 ```
+
+> **练习 vs 成品**：`CSharpPractice/` + `UnityPractice/` 放**技术练习**（为学某个特性而建，不追求可玩、不占成品编号）；`Projects/` 只放**里程碑成品**（能跑通一局、编号 1 起）。已验证的写法再搬进新成品，旧成品一律不回改。
+>
+> **大素材不进 git**：模型 / 贴图 / 音频原文件放仓库外的素材库，用时拷进工程并由 `.gitignore` 排除；仓库只留 `Assets/` 下的脚本、场景、预制体、动画与配置资产。
 
 ## 打卡规则
 
