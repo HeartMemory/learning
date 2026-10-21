@@ -3771,6 +3771,125 @@ $$v_{\max} \times \Delta t < \text{触发器厚度}$$
 
 ---
 
+## 第 34 章 · Animator 深水区：Humanoid / Avatar / 重定向 · Blend Tree 阈值 · 过渡三铁律 · 两种离地（10-21 · Block 5 第 1-2 关）
+
+> 载体 = `UnityPractice/AnimLab`（练习工程，不占成品编号）；素材 = Asset Store 官方 `Starter Assets - ThirdPerson | URP`。
+
+### 一、Humanoid 导入：判据不靠眼睛
+
+| 判据（文件层） | 实测值 | 含义 |
+|---|---|---|
+| `animationType` | **3** | = Humanoid（`0` None / `1` Legacy / `2` Generic / `3` Humanoid） |
+| `humanDescription` 的 `boneName` 条数 | **53** | 人体部位槽位已全部填好 |
+| **空 `boneName` 条数** | **0** | ⭐ **= 机器口径的"没有红叉"** |
+| `Animator.isHuman`（运行时） | **true** | 第二路独立验证 |
+
+⭐ **判据：`animationType: 3` + 空 `boneName` 为 0 + `isHuman` 为真 = 三路独立证据**，比"看起来是绿的"可靠。
+
+界面里三种标记，别搞混：
+
+| 标记 | 含义 | 要修吗 |
+|---|---|---|
+| 绿色实心圆 | 已映射 | — |
+| **红叉** | **必需**槽位缺骨骼 | ✅ 必修 |
+| 无标记 / 空心 | **可选**槽位未映射（`Jaw` / `Eyes` / `UpperChest`） | ❌ **正常，别修** |
+
+### 二、Avatar = 骨骼的"接口"
+
+| OOP | 3D 动画 |
+|---|---|
+| 接口 `IShape` | **Avatar**（Unity 标准人体部位，55 个槽位） |
+| 实现类 `Circle` / `Square` | `Armature` / `KyleRobot` 各自不同的骨骼命名 |
+| 调用方只认 `IShape` | **动画 clip 只认"左大腿"**，不认具体骨头 |
+
+⇒ **换角色不用重做动画**，因为动画从来没针对某个具体角色 ⇒ 这就是**重定向（Retargeting）**。
+
+**零风险实证**：把 `KyleRobot.prefab` 拖进场景，它挂的仍是同一套 controller / 同一批动画，走跑跳照常 —— 一个**完全不同**的模型跑同一套动作，这就是重定向的全部意义。
+
+### 三、Rig 三选一：判据不是"是不是人"
+
+| 类型 | 什么时候选 | 代价 |
+|---|---|---|
+| **Humanoid** | 人形，且**要跟别的角色共用一套人形动画** | 需要 Avatar 映射；换来：重定向 / Avatar Mask（按身体部位遮罩）/ 脚部 IK |
+| **Generic** | 非人形（四足 / 机械臂），或人形但永不换装 | 丢掉重定向与 Body Mask |
+| **Legacy** | 老动画系统（`Animation` 组件） | 新项目不用 |
+
+另：Avatar 的零位姿势 = **T-Pose**；姿势不对会出现肩/手臂扭曲，`armStretch` / `legStretch` 就是兜这个的参数（本模型两个都是 `0`）。
+
+### 四、Blend Tree：连续插值 vs 过渡的离散跳变
+
+| | 普通过渡 | **Blend Tree** |
+|---|---|---|
+| 本质 | **离散跳变 + 交叉淡化**（两段动画不同时存在） | **连续插值**（多段动画**按权重同时播**） |
+| 中间速度 | 没有对应姿势，只能硬切再淡 | 任意速度都有对应姿势 |
+| 典型症状 | 加速时"卡一下 / 滑步" | 脚步与位移始终对得上 |
+
+#### ⭐ 阈值来自参数的**真实取值**，不是"有几个 clip"
+
+`ThirdPersonController.cs` 里：`MoveSpeed = 2.0`、`SprintSpeed = 5.335`、`Speed` 参数 = 向目标值 Lerp 的 `_animationBlend`。
+
+| Threshold | Motion |
+|---|---|
+| `0` | `Idle` |
+| `2` | `Walk_N` |
+| **`6`**（原版取 6，不是 5.335） | `Run_N` |
+
+- ⚠️ **`Automate Thresholds` 必须关**：它把 N 个 clip 在 **0–1** 均分（0 / 0.5 / 1）；`Speed` 到不了 0.5 以下的"走"区 ⇒ 走路时混到跑步动画。
+- ⭐ **原版为什么取 6 而不是 5.335**：冲刺时 `Speed = 5.335` 落在 2→6 的 **89%** 位置 ⇒ `Run_N` 权重 ~0.89、`Walk_N` 还有 0.11 ⇒ **冲刺仍留一点"走"的成分**。
+- ⭐ 判据：**阈值是"权重分配的设计"，不是"速度的精确映射"。**
+- ⚠️ 列表第三列那个 `1` 是**该行 clip 的播放速度倍率**（`Adjust Time Scale` 自动调的就是它）；原地动画（平均速度≈0）算不出来 ⇒ 会报黄字，手动留 `1` 即可。
+
+> 三个"Speed"辨析：**参数 `Speed`** 决定播什么（混到哪）、**状态上的 `Speed`** 决定整个状态播多快、**混合树每行的 `1`** 决定那一行 clip 的倍率。
+
+### 五、过渡三铁律
+
+| # | 规则 | 为什么 | 症状 |
+|---|---|---|---|
+| 1 | **参数驱动 → 关 `Has Exit Time`**<br>**动作驱动 → 开** | 关 = 条件满足立刻走；开 = 等当前动画播到某比例 | 该关不关 ⇒ 按了 W 人已经在动、动画还站着 |
+| 2 | **参数驱动的过渡时长 < 0.1**（0.038 / 0.070 / 0.098 是原版取值） | 0 = 硬切会"跳关节"；太久 = 发飘、脚打滑 | 新建过渡默认 **0.25** ⇒ 起跳"软绵绵" |
+| 3 | **`Any State` 的过渡必须关 `Can Transition To Self`** | 条件若"持续为真"（如 `Grounded == false`），每帧都会重进该状态 | **动画原地抽搐**（每帧被拽回第 0 帧；类比"循环里每轮把 i 重置成 0"） |
+
+### 六、⭐ 两种离地：`Jump` vs `FreeFall`（原版最漂亮的一手）
+
+| 你怎么离地的 | 参数 | 走哪条边 | 有起跳动作吗 |
+|---|---|---|---|
+| **主动按空格** | `Jump == true` | → `JumpStart` | ✅ 有 |
+| **走下坡 / 掉下边缘** | `FreeFall == true` | → `InAir` | ❌ 直接进空中 |
+
+- `Jump` / `FreeFall` 都是**事件型** bool：脚本在"起跳瞬间 / 开始下坠瞬间"置 true，之后置 false。
+- ⭐ **`Grounded` 只做一件事：`InAir → JumpLand`（判断"落地了"），绝不用来触发"起跳"** —— 它的**默认值是 false**，拿它当触发条件，**游戏第一帧**就会误触发（症状：开局莫名蹦一下）。
+
+### 七、原版四状态 + 五条过渡（照抄版，全部真值）
+
+| # | 源 → 目标 | 条件 | 退出时间 | Exit Time | 时长 | 中断源 |
+|---|---|---|---|---|---|---|
+| 1 | `Locomotion → InAir` | `FreeFall == true` | 关 | — | 0.038 | 无 |
+| 2 | `Locomotion → JumpStart` | `Jump == true` | 关 | — | 0.070 | 无 |
+| 3 | `JumpStart → InAir` | **无条件** | **开** | **0.664** | 0.470 | 无 |
+| 4 | `InAir → JumpLand` | `Grounded == true` | 关 | — | 0.098 | 无 |
+| 5 | `JumpLand → Locomotion` | **无条件** | **开** | **0.399** | 0.434 | **Destination** |
+
+- `JumpLand` 状态也是 **BlendTree**（`JumpLand` @0 / `Walk_N_Land` @2 / `Run_N_Land` @6）—— 落地动作要跟速度匹配。
+- `JumpLand` 这个 clip 藏在 **`Jump--Jump.anim.fbx`** 里（该 fbx 含 `JumpStart` + `JumpLand` **两个** clip）⇒ **拖 Motion 时要展开 fbx 再拖**，直接拖 fbx 只会拿到第一个。
+- ⚠️ **第 5 条的中断源 = `Destination`**（中文界面未翻译，显示 **`Next State`**）：允许**目标状态**的出边打断这条过渡 ⇒ 落地缓冲能被玩家操作打断，不会僵一下才起步。
+
+| 英文文档 | 中文界面 | 含义 |
+|---|---|---|
+| None | 无 | 不允许被打断 |
+| Current State | Current State | 允许**当前**状态的出边打断 |
+| **Destination** | **`Next State`** | 允许**目标状态**的出边打断 |
+| Current State Then Next State / Next State Then Current State | 同名 | 两种顺序 |
+
+### 八、三条元判据
+
+1. **状态数量不是越多越好**：每个状态应对应**一个必须单独决策的分支**。"走 vs 跑"若拆成两个状态，就要单独写一条过渡、单独调阈值 —— 而 Blend Tree 用一条连续曲线替掉了它。
+2. **参数名必须一字不差**：脚本里 `Animator.StringToHash("Speed")` 是写死的；名字错一个字母或类型不对（Float 写成 Bool），**Unity 不报错、直接忽略** ⇒ 状态机永远不动。
+3. **`Animator.Controller` 槽为空 ⇒ 角色定格在 T-Pose**：看到 T-Pose 不是"动画坏了"，是"没有人下指令"。反过来也成立：**能看到动画，就说明确实有个 controller 在跑**（可能是别人的）。
+
+### 九、今天没做的（指向回访清单）
+
+`MotionSpeed` 缩放（防滑步）／ 脚部 IK（`ikFeet`，原版运动/起跳/空中三个状态都开着）／Layer + Avatar Mask／2D Freeform Directional／子状态机 + `StateMachineBehaviour`／Root Motion 判据 —— 见回访清单。
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
@@ -3830,6 +3949,8 @@ $$v_{\max} \times \Delta t < \text{触发器厚度}$$
 
 ### 🧪 实验项（等触发）
 
+- [ ] **Layer + Avatar Mask（10-21 记）**：现在只有一个 Base Layer。`Avatar Mask` 是 **Humanoid 独有**的能力（Generic 没有"按身体部位遮罩"这一说）｜ **触发判据** = 出现"上半身与下半身动作要分离"的需求（边跑边瞄准 / 边跑边挥手 / 受伤只抖上半身）｜ **落地判据** = 建出第二层 + 上半身 Mask，跑动时上半身能独立播另一段动画，且切换时下半身不被打断
+- [ ] **脚部 IK（`iKOnFeet`）（10-21 记）**：原版 `Idle Walk Run Blend` / `JumpStart` / `InAir` 三个状态都**开着**，`JumpLand` **关着**（落地缓冲不需要贴脚）｜ **触发判据** = 角色站在斜坡 / 台阶 / 高低不平的地面上，脚底出现"悬空一只脚"或"插进地面" ｜ **落地判据** = AnimLab 加一段斜坡，开 IK 后脚掌贴合坡面，关掉后能复现"悬空脚"
 - [ ] **走路音步频与速度脱钩（10-20 记）**：现在判"在走"看**输入**（`MoveInput`）不看速度、节拍写死 0.32 s ⇒ 冲刺步频不变（听感像滑冰）、贴墙走有声、被撞滑行无声 ｜ **触发** = 做手感打磨 / 加冲刺动画时 ｜ **落地** = 步频反比于水平速度（带上下限）+ "输入"与"速度"双筛
 - [x] ~~**`CharacterController` vs `Rigidbody + linearVelocity` 对照（10-14 记）**~~（**10-16 销账 ✓ · 决定不做**）：闸门②已达成，路线**已定**为 `Rigidbody` + **探针组合拳**（`CheckSphere` + `Raycast`）；查证结论 = 半路换 `CharacterController` 会**作废 10-14 起建的三天代码**（`linearVelocity` / `MoveRotation` / 冻结旋转），且它"动量不真实"、会丢掉"撞飞物件"这类效果 ⇒ 见本册第 30 章
 - [ ] **`Run` 动画周期与角色速度同步（10-05 记）**：`PlayerRun.anim` 固定 0.2s 一拍，与 `moveSpeed` 无关 → 调 State 的「速度」乘数或 `animator.speed`（`= 实际速度 / 基准速度`）；再学 **Blend Tree** 做"速度混合"
