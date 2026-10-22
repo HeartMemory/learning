@@ -3890,6 +3890,120 @@ $$v_{\max} \times \Delta t < \text{触发器厚度}$$
 
 `MotionSpeed` 缩放（防滑步）／ 脚部 IK（`ikFeet`，原版运动/起跳/空中三个状态都开着）／Layer + Avatar Mask／2D Freeform Directional／子状态机 + `StateMachineBehaviour`／Root Motion 判据 —— 见回访清单。
 
+---
+
+## 35. 动画分层：`Layer` · `Avatar Mask` · 层权重（10-22 · Block 5 第 2 天）
+
+> 本课分界：前面所有动画都是**单层**（一个状态机管全身）；今天第一次让**两套状态机同时跑**，各自只对一部分骨骼有**写入权**。
+
+### 一、四个概念，别混为一谈
+
+| 概念 | 回答的问题 | 谁管 |
+|---|---|---|
+| **Layer** | 有几套状态机在同时跑 | `.controller` 的 Layers 面板 |
+| **Avatar Mask** | 这层对**哪些身体部位**有写入权 | `.mask` 资产（人体图勾选） |
+| **层 Weight** | 这层**是否参与**混合（0 = 完全不参与） | 资产默认值 + 运行时 `SetLayerWeight` |
+| **状态过渡** | 这层里**播哪一段**动作 | 层内状态机的过渡箭头 |
+
+⭐ 收口判据：**`Weight` 管"这层存不存在"，过渡管"层内播哪一段"。** 用过渡做"不举枪"是错的 —— 那个"不举枪"状态会**持续写上半身姿势**（Idle 的上半身）⇒ 跑动时不摆臂，反而不自然。
+
+### 二、官方怎么说（两条独立来源一致）
+
+- **Layer** = 一层独立状态机；`Mask` 划定"这层对哪些部位有写入权"、`Blending` 决定与下层的叠加方式（Manual「Animation Layers」）
+- 官方给的例子就是**下半身走 + 上半身射击/投掷**
+- **Humanoid** 用人体图勾选：绿=包含、红=排除；**Generic/精细控制**走 `Transform` 方式，需先赋 Avatar 引用 + 点 `Import Skeleton`
+- **遮罩还能省内存与 CPU** —— 未激活部位的曲线根本不求值
+
+### 三、遮罩的目标状态（唯一判据：绿=写入权）
+
+| 图上的位置 | 枚举名 | 拿来做"上半身动作"时 |
+|---|---|---|
+| 脚下阴影 | `Root` | 🔴 红（根变换不能给上层） |
+| **胸腹（躯干）** | **`Body`** | 🟢 **绿（必须！否则只有胳膊动、躯干不转）** |
+| 头 | `Head` | 🟢 绿 |
+| 左 / 右臂 | `LeftArm` / `RightArm` | 🟢 绿 |
+| 左 / 右手 | `LeftFingers` / `RightFingers` | 🟢 绿 |
+| 左 / 右腿 | `LeftLeg` / `RightLeg` | 🔴 红（留给 Base 层） |
+| 手腕 IK | `LeftHandIK` / `RightHandIK` | 跟随部位（上半身绿就绿） |
+| 脚踝 IK | `LeftFootIK` / `RightFootIK` | 跟随部位（腿红就红） |
+
+操作技巧：**双击人体图外的空白区 = 一键全绿/全红**，比逐个点快。
+
+⭐ 可核验的判据（代码读回，不靠眼睛）：
+```csharp
+var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(path);
+mask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Body);   // true
+mask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftLeg); // false
+```
+
+### 四、三个配置陷阱（都实测撞到）
+
+| 陷阱 | 现象 | 根因 / 正解 |
+|---|---|---|
+| `Animation Type = Humanoid` 时 **`No Avatar` 变灰不可选** | 以为界面坏了 | **Humanoid 的一切能力都建立在 Avatar 上**（重定向 / 人体图遮罩 / IK）⇒ 它强制要 Avatar。只有 `Generic` / `Legacy` 才允许 `No Avatar` |
+| **`Copy From Other Avatar` 不是万能的** | 套到另一套骨架上报错 | 它只适用"**同一 rig 换 mesh**"；两套不同骨架必须用 **`Create From This Model`** |
+| **`Override` 层是空状态机** | 遮罩区被写成**默认姿势（T-Pose）**，上半身炸开 | 因为 `Write Defaults` 会写默认值 ⇒ 层里**必须有状态**（哪怕用 `Idle` 占位） |
+
+### 五、`Blending` 的两种模式
+
+| 模式 | 含义 | 典型用途 |
+|---|---|---|
+| **`Override`**（默认） | 高层**覆盖**遮罩内的部位 | 上半身换一套完全不同的动作（举枪/攻击） |
+| `Additive` | 高层**叠加偏移**在底层结果上 | 呼吸起伏、受击抖动、Aim Offset 微调 |
+
+⚠️ `Additive` 需要引用一个**参考姿势（reference pose）**，配置成本更高 ⇒ 先掌握 `Override`，`Additive` 等有"抵消 / 叠加"需求时再上。
+
+### 六、⭐ 姿势 vs 位置（为什么"上半身会晃"）
+
+| 东西 | 由谁决定 | 上层能改吗 |
+|---|---|---|
+| **姿势**（脊柱、手臂的旋转曲线） | 上层（遮罩覆盖的部位） | ✅ |
+| **位置**（骨盆起伏、左右微摆） | **Base 层的跑动动画** | ❌ **改不了** |
+
+⇒ 上半身**姿势**钉住了，但它挂在还按跑步动画起伏的**骨盆**上 ⇒ 整个人被"抬着晃"。**这不是 bug，是分层的固有特性。**
+
+⭐ 判据：**Layer 叠加的是「姿势」，不是「物理」；位置与根运动永远来自 Base 层。** 想让瞄准更稳只有三条路：**瞄准降速** / **`Additive` 偏移层（Aim Offset）** / **Spine IK** —— 业界主流是前两条。
+
+### 七、素材与导入（Humanoid 重定向的实战）
+
+导入设置两步，顺序不能反：
+
+| 步 | 标签 | 设置 |
+|---|---|---|
+| 1 | `Rig` | `Animation Type = Humanoid` + `Avatar Definition = Create From This Model` → **Apply** |
+| 2 | `Animation` | 勾 `Loop Time`（循环动作）；⚠️ **`Root Motion` 要看清** —— 原地动画用不带 `_RM` 的版本 |
+
+⭐⭐ **`.meta` 就是配置本身**：Humanoid 的导入设置与 **52 条骨骼映射**全存在 `<文件>.fbx.meta` 里。只提交 FBX、不提交 `.meta` ⇒ 别人 clone 后 Unity 按默认重建（`Generic` + `NoAvatar`）⇒ **重定向、人体图遮罩、IK 全部失效，而且不报错**。
+
+可核验判据（自动映射成功后应当如此）：
+
+| 判据 | 期望 |
+|---|---|
+| `Avatar.isHuman` | `true` |
+| `humanDescription.human` 里空 `boneName` 的槽位数 | **0**（= 没有任何红叉） |
+| 槽位总数 | 52 |
+
+### 八、代码：用 `SetLayerWeight` 做淡入淡出
+
+```csharp
+bool holding = Mouse.current != null && Mouse.current.rightButton.isPressed;
+float target = holding ? 1f : 0f;
+_currentWeight = Mathf.MoveTowards(_currentWeight, target,
+                                   Time.deltaTime * (holding ? _fadeInSpeed : _fadeOutSpeed));
+_animator.SetLayerWeight(_upperBodyLayer, _currentWeight);
+```
+
+| 判据 | 说明 |
+|---|---|
+| **`MoveTowards` + `deltaTime × 速度`** | 帧率无关的**匀速**推进；换 `Lerp(a, b, dt*k)` 会**永远逼近不到**目标 |
+| 层里**必须有状态**（Weight 抬起来时它就在播） | 否则遮罩区变 T-Pose |
+| 层 `Weight` 的**资产默认值设 0** | 开局不举枪；运行时由代码抬起来。⚠️ 改完记得 `文件 → 保存项目` |
+| ⚠️ **`m_DefaultWeight: 0` 不等于"权重是 0"** | **Base Layer** 的权重固定为 1、面板里灰色不可调 ⇒ 序列化时写占位值 `0`。判权重只看运行时 `GetLayerWeight(i)` 或"动画到底在不在播" |
+
+### 九、今天没做的（指向回访清单）
+
+`Additive` 模式与 Aim Offset／Spine IK 上身稳定／`Aim` 输入从设备层升级到 Actions 层（可重映射）／图层 `IK Pass` 与 `OnAnimatorIK`／2D Freeform Directional —— 见回访清单。
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
@@ -3979,6 +4093,8 @@ $$v_{\max} \times \Delta t < \text{触发器厚度}$$
 - [ ] **移动平台（10-04 记）**：巡逻敌人用的是"**Dynamic 交速度**"；**移动平台**的通行做法不同（玩家要"跟着走"：父子关系 / 速度传递 / 平台速度叠加）→ 做"多关卡 / 传送门"前后评估一次
 - [ ] **相机「多目标偏移」（10-17 记）**：现在只跟 `Player` 一个目标（`target` 单点）。等关卡出现**单个必须引导的内容**（机关 / 宝箱 / 关键 NPC）时，让镜头以玩家为主、朝目标**偏移一个可控上限**（离开后平滑回位），引导玩家注意关键信息 —— 这是 2D 相机跟随三件套（死区 / 平滑 / 多目标偏移）里**唯一还没做**的一项。**触发判据 = 做"机关 / 宝箱 / 关键 NPC"那天**；**落地判据 = 靠近目标时镜头有偏移、离开后回到纯跟随**。⚠️ 前提要判断对：散布的金币、必经的终点**不需要**它（前者偏了反而乱、后者靠 `lookAheadX` 就够）
 - [ ] ⭐ **移动中的动画滑步（10-22 记 · 自己发现 · 已知、暂不修）**：三档症状 —— ① 摇杆**轻推**（实际速度 < 1）几乎像**平移**（脚不动人动，最明显）② 半推时"半迈不迈"③ **中间速度**（`Speed` 2~6）两腿动作互相打架 ｜ **已排除速率这条线**（实测）：Blend Tree 的阈值（`0 / 2 / 6`）恰好等于三段的**设计速度**时，"加权设计速度 ≡ `Speed` 参数"是**恒等式**（`2 + 4t = Speed`）⇒ 播放速率保持 **1** 时位移已经零误差；而把「乘数」打开、喂 `inputMagnitude` 会让**同一个"慢"被算两遍**（权重按速度缩一次、速率按幅度再缩一次）⇒ 反而更滑 ｜ **真根因三条**：① **姿势混合 ≠ 速度混合** —— 线性插值混的是**骨骼姿势**，`Idle` 权重 0.9 时是"90% 的骨骼原地站着、10% 在迈步"，人却在移动（慢速最痛，因为 `Idle` 不是"0 速的走"，是另一套姿势体系）② **相位漂移** —— `Walk_N` **0.97 s** / `Run_N` **0.67 s** 各自独立循环，权重 0.5 时一段在迈左脚、另一段可能在迈右脚 ⇒ 混合出的姿势互相抵消 ③ `_animationBlend` 用 `Lerp(dt×10)` 追 `_speed`，起停瞬间有 **0.1 s** 滞后 ｜ **试过并否决**：相位对齐（`Run_N` `timeScale 0.69` + 阈值 `4.14`）→ 代价是跑步动画**放慢 31%**、观感变"快走"，**用新问题换旧问题，不做** ｜ **治本方向（三选一，都要更多素材/知识）**：① **加密采样点**（`Walk 2 → Jog 3~4 → Run 6`；线性插值误差 ∝ 采样间隔² ⇒ 区间减半误差降到 **1/4**，这是最治本的一条）② 相位对齐（相邻档位循环长度成整数比）③ 把 `Idle` 移出 Blend Tree 变独立状态 + 低速时按 `_speed / MoveSpeed` 缩播放速率（方案已成型、**本次未实施**） ｜ **触发判据** = 有了 Jog 类中间速度动作 / 学到 Foot IK 与 2D Freeform Directional ｜ **落地判据** = 推幅 0.1 / 0.5 / 0.7 三档走动，脚不打滑
+- [ ] **瞄准时上半身晃（`Additive` 层 / Spine IK）（10-22 记）**：上层 `Override` 只能**覆盖姿势**，改不了**位置** —— 骨盆还按 Base 层跑动起伏 ⇒ 举枪时整个人被"抬着晃" ｜ **触发判据** = 出现"跑动中要精确瞄准"的需求（或做第一人称/越肩视角）｜ **落地判据** = 跑动举枪时准星不随步伐上下跳；手段三选一：**瞄准降速**（最便宜）/ **`Additive` 偏移层（Aim Offset）**（需要参考姿势）/ **Spine IK**（要写 `OnAnimatorIK`）。见本册第 35 章第六节
+- [ ] **`Aim` 输入从设备层升级到 Actions 层（10-22 记）**：现在用 `Mouse.current.rightButton`（零配置，但**写死设备、玩家改不了键、不能多玩家**）｜ **触发判据** = 出现"允许玩家重映射按键 / 要支持手柄同一动作"的需求 ｜ **落地判据** = 把 `Aim` 加进 `.inputactions`、`StarterAssetsInputs` 加 `aim` 字段，之后改绑到侧键仍能举枪。见本册第 35 章第九节
 
 ### ✅ 已销（一行一条 · 时间倒序 · 折叠）
 

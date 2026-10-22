@@ -2566,6 +2566,74 @@ long ms = sw.ElapsedMilliseconds;      // ③ 读总毫秒
 
 ---
 
+## 51. 特性（Attribute）· 只读属性 · 局部变量必须先赋值（10-22 · Block 5 第 2 天）
+
+> 三个语言层小点，都是今天写 `UpperBodyAim` 时真实撞到的，不是看文档抄的。
+
+### 一、`[RequireComponent(typeof(Animator))]`：把依赖写进类型
+
+**Attribute 是贴在类型/成员上的元数据标签，本身不执行任何代码** —— 它由框架（这里 = Unity 编辑器）通过反射读取，再决定行为。
+
+| 时机 | 没有它 | 有它 |
+|---|---|---|
+| 挂脚本到物体 | 物体可能没 `Animator` | **编辑器自动补一个** |
+| 想删那个 `Animator` | 随便删 | **拒绝删除**（被依赖） |
+| `GetComponent<Animator>()` 的返回 | **可能 `null`** ⇒ 首次使用就 NRE | **一定不是 `null`** |
+
+⭐ 判据：**它把"运行时会炸的依赖"提前成"编辑期自动满足的约束"。**
+
+```csharp
+// 甲：靠人记得（错误留到运行时）
+// 注释：⚠️ 记得挂 Animator
+_animator = GetComponent<Animator>();
+
+// 乙：靠类型声明（错误在编辑期被抹平）
+[RequireComponent(typeof(Animator))]
+```
+
+可以写多个：`[RequireComponent(typeof(A), typeof(B))]`。
+
+### 二、`{ get; internal set; }` = "对外只读"
+
+新输入系统里：
+
+```csharp
+public static Mouse current { get; internal set; }
+```
+
+| 访问器 | 谁能写 |
+|---|---|
+| `public` 的 `get` | 谁都能读 |
+| **`internal` 的 `set`** | **只有同一程序集内部**能写 |
+
+⇒ 我们的代码里写 `Mouse.current = xxx;` **直接编译不过**（跨程序集）。这就是"看起来有个 `set`，其实你写不了"。
+
+⭐ 判据：**`{ get; private set; }` / `internal set` 是"对外只读、对内可变"的标准写法** —— 比 `readonly` 字段更灵活（外部只读、内部仍要能改）。想改变 `current` 指向，只能用公开方法（如 `MakeCurrent()`）或 `InputSystem.AddDevice<T>()`。
+
+### 三、字段 vs 局部变量的初始化（C 背景对照）
+
+| 位置 | C# 规则 | C 的对照 |
+|---|---|---|
+| **字段**（类成员） | **有默认值**（`float` → `0f`、引用类型 → `null`），不写也能用 | 只有全局/静态变量才是 0 |
+| **局部变量** | **必须先赋值**，否则 **CS0165**（用了未赋值的局部变量） | **不初始化 = 未定义行为**：读到垃圾值，**静默** |
+
+```csharp
+private float _currentWeight;   // 字段：默认 0f，显式写 = 0f 只是表达意图
+void F() { float x; x += 1; }   // 局部变量：CS0165，编译不过
+```
+
+⭐ 判据：**同一类错误在两个语言里的暴露时机完全不同** —— C 的未初始化局部变量是**静默 UB**，C# 把它变成**编译错误**。（这也是为什么"字段显式初始化"在 C# 里属于**可选的清晰**，不是必需的保命。）
+
+### 四、顺带：`GetComponent` vs `.current`（两种依赖来源）
+
+| | `Animator`（组件） | `Mouse`（设备对象） |
+|---|---|---|
+| 怎么拿 | `GetComponent<Animator>()` | `Mouse.current` |
+| 生命周期 | 跟场景/物体走 | 跟**物理设备**走（插拔时生灭） |
+| 是 `MonoBehaviour` 吗 | ✅ | ❌（所以没有 `Start`/`Update`） |
+
+⭐ 判据：**挂在物体上的用 `GetComponent`，接在电脑上的用 `.current`。**
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 - [ ] **运算符重载 × `null` 合并运算符（10-16 记）**：`UnityEngine.Object` **重载了 `==`**（"假 null"语义），而 `??` / `??=` / `?.` 走的是 **CLR 的"真 null"检查**、**绕过**那个重载 ⇒ 实测症状 = "**永远补不上、静默走兜底**"（详见 `Unity-基础笔记.md` 第 30 章第六节 + 错题本「错误 31」）。回来做两件小事把这条钉死：① 自己写一个**重载了 `==` / `!=` 的小类**，观察 `x == null` 与 `x ??= y` **出现分歧**的那一刻 ② 顺带对照 `?.` 与 `??` 在自定义重载下的行为 —— 收口一句：**运算符重载只改语法糖的语义，不改 CLR 的 null 判定**
