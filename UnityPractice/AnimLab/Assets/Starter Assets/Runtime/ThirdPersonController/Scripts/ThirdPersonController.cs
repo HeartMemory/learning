@@ -245,7 +245,11 @@ namespace StarterAssets
                 _speed = targetSpeed;
             }
 
-            _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
+            // ⚠️ 本工程改动（2026-10-22 · 自己发现并修复）：
+            //    原版目标是 targetSpeed（= "意图"），不乘 inputMagnitude ⇒
+            //    「手柄轻推 + 按住冲刺」时实际速度只有 2.67，却仍然播 Run_N（跑步动作）= 动作档位与实际速度脱钩。
+            //    改成跟 _speed（真实水平速度）后，权重与位移同源：走速 ⇒ 走动画，跑速 ⇒ 跑动画。
+            _animationBlend = Mathf.Lerp(_animationBlend, _speed, Time.deltaTime * SpeedChangeRate);
             if (_animationBlend < 0.01f) _animationBlend = 0f;
 
             // normalise input direction
