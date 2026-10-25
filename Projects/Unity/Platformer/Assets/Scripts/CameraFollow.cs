@@ -106,21 +106,33 @@ public class CameraFollow : MonoBehaviour
         if (_targetRb != null)
             look = Mathf.Clamp(_targetRb.linearVelocity.x / lookAheadAtSpeed, -1f, 1f) * lookAheadX;
 
+        bool edgeX = false;                    // ⭐ 本帧目标是否被【边界】钉住（钉住 = 不许死区插手）
         if (right - left > halfW * 2f)
-            _goal.x = Mathf.Clamp(target.position.x + look, left + halfW, right - halfW);
+        {
+            float wantX = target.position.x + look;    // 玩家"想要"的相机位置（还没夹）
+            _goal.x = Mathf.Clamp(wantX, left + halfW, right - halfW);
+            edgeX = Mathf.Abs(_goal.x - wantX) > 0.001f;
+        }
         else
             _goal.x = (left + right) * 0.5f;   // ⭐ 硬夹会出现"下界 > 上界"⇒ 装得下时改用居中
 
         // ── ④ y：偏下 + 夹取；装得下就 fixedY（🏯 爬塔关靠这条开始纵向跟随）──
+        bool edgeY = false;                    // 同上：纵向边界钉住时也不许死区插手
         if (top - bottom > halfH * 2f)
-            _goal.y = Mathf.Clamp(target.position.y + yBias, bottom + halfH, top - halfH);
+        {
+            float wantY = target.position.y + yBias;
+            _goal.y = Mathf.Clamp(wantY, bottom + halfH, top - halfH);
+            edgeY = Mathf.Abs(_goal.y - wantY) > 0.001f;
+        }
         else
             _goal.y = fixedY;                  // ⭐ 关卡竖着也装得下 ⇒ 保持原来的固定高度
 
         // ── ⑤ 死区：目标离相机太近 ⇒ 吸附到相机位置（画面彻底静止）──
-        //    ⚠️ 取舍：贴着关卡边缘时最多会"差 deadZone 格就停住"—— 这是消抖的代价（0.5 格肉眼看不出）
-        if (Mathf.Abs(_goal.x - transform.position.x) < deadZoneX) _goal.x = transform.position.x;
-        if (Mathf.Abs(_goal.y - transform.position.y) < deadZoneY) _goal.y = transform.position.y;
+        //    ⚠️ 边界优先于死区：被夹取钉住的目标【不吸附】
+        //       否则相机永远差 deadZone 格到不了关卡边缘 ⇒ 最边缘的终点会停在画面外
+        //       （2026-10-25 实测：Level1 终点 x=25.2，相机卡在 9.78 ⇒ 视野右界仅 24.0）
+        if (!edgeX && Mathf.Abs(_goal.x - transform.position.x) < deadZoneX) _goal.x = transform.position.x;
+        if (!edgeY && Mathf.Abs(_goal.y - transform.position.y) < deadZoneY) _goal.y = transform.position.y;
         _goal.z = transform.position.z;        // z 保持不变
 
         // ── ⑥ 平滑逼近目标 ──
