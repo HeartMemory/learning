@@ -4138,6 +4138,99 @@ t = (5.335 − 2) / (6 − 2) = 0.834
 - 量步频用 `Time.time - _lastTime`，**别用 `deltaTime` 累加**（会漏帧、越算越偏）
 - 新脚本**别写进第三方示例包**：同族方法同名 ⇒ `CS0111`；放自己的目录、挂在同一物体上即可并存
 
+## 38. Root Motion：位移的所有权 · 三条投影通道 · 谁最后写 `transform`（10-26 · Block 5 第 6 天）
+
+> 一句话：**Root Motion 不是"让动画带位移"，是"位移所有权的移交"** —— 打开 `Apply Root Motion` = Animator 每帧把「质心在 Y 平面的投影增量」**写进 `transform`**，与你自己写的位移**抢同一个位置**。**同一时刻只能有一个写者。**
+
+### 1. 官方口径（Unity 6.3 LTS，三页文档，构建日 2026-10-24）
+
+| 出处 | 原文要点 |
+|---|---|
+| Animator 组件页 | `Apply Root Motion`：*"Select whether to control the character's position and rotation **from the animation itself or from script**"* ← **一句话判据** |
+| How Root Motion works | **Body Transform = 角色质心**，是 Clip 中**唯一存储的世界空间曲线**（肌肉曲线 / IK 目标都相对它存）；**Root Transform = Body Transform 在 Y 平面的投影，运行时逐帧计算**，其 delta 施加到 GameObject |
+| 同上（三通道） | `Root Transform Rotation` / `Position (Y)` / `Position (XZ)` 各有 **Bake Into Pose**：开启 = 留在姿势里、**delta 恒为 0**；关闭 = 该分量进入 Root Motion |
+| 同上（Note） | `Animator.gravityWeight` **由 Position Y 的 bake 驱动**：烘焙 = 1、不烘焙 = 0，切换状态时会被混合 |
+| 同上（Based Upon） | Rotation 的 `Body Orientation`（默认）适合走跑跳的 Mocap，**但对侧移（strafe）失效**（侧移方向 ⊥ body forward）⇒ 那种剪辑要用 `Offset` / `Original`；Position Y 的 `Feet` 用于避免过渡时"漂浮" |
+| Scripting Root Motion | 只要同物体上的脚本实现了 **`OnAnimatorMove`**，Animator 就把该属性显示为 **`Handled by Script`** ⇒ 应用权转交脚本 |
+| OnAnimatorMove 页 | 调用时机 = **状态机与动画求值之后、`OnAnimatorIK` 之前**；官方示例前提明写 **Enable "Apply Root Motion"**；`deltaRotation` 的用法是**累乘**（`transform.rotation *= delta`），不是赋值 |
+
+### 2. AnimLab 的机器证据（扒文件，不靠眼睛）
+
+| 项 | 实测值 |
+|---|---|
+| `PlayerArmature` | `applyRootMotion = False` ｜ `controller = MyThreeState` ｜ `isHuman = True` ｜ **CharacterController = True** ｜ Rigidbody = False ｜ `updateMode = Normal` |
+| 控制器在用 8 个剪辑 | `Idle` / `Walk_N` / `Run_N` / `JumpStart` / `InAir` / `JumpLand` / `Walk_N_Land` / `Run_N_Land`（两个 BlendTree 1D + UpperBody `Aim`） |
+| 这 8 个的两/三通道 | **`rot=1 Y=1 XZ=1` 全烘焙 ⇒ delta 恒为 0（纯原地）** |
+| ⭐ 唯一的例外 | **`Locomotion--Run_S`：`rot=0 XZ=0`**（真带位移 + 转向）—— 而它**没有被控制器引用** |
+
+🔍 **查法**：FBX 剪辑的 Root Motion 设置写在 **`.fbx.meta`** 里，字段名是 `keepOriginalOrientation`（Rotation 烘焙）/ `keepOriginalPositionY` / `keepOriginalPositionXZ`，**`1` = 烘焙 = 没有位移**。
+
+> ⭐ 判据：**别用"预览窗里角色在动"来判断有没有 root motion** —— 预览演的是 **body transform**（质心），任何剪辑都会动。唯一判据是三条通道的 `Bake Into Pose` 开关。
+
+### 3. A 实验：勾上 `Apply Root Motion` 会怎样（10-26 实测）
+
+**做法**：Play 模式里选中 `PlayerArmature` → Animator → 勾 `Apply Root Motion` → 走 / 跑 / 跳。**停止播放即还原**（Play 模式不能保存场景 ⇒ 不会污染工程；退出后读回 `applyRootMotion = False`、`deltaPosition = (0,0,0)`、`Speed = 0`，确认干净）。
+
+| 观察到的现象 | 根因（同一条） |
+|---|---|
+| **移动几乎完全不动** | 代码在 `Update` 里 `_controller.Move()` 写位移 → 同帧 Animator 因为"有所有权"又把自己的 `rootPosition`（= 起点 + Σ delta ≈ **起点**）写回 `transform` ⇒ **每帧被拽回原点**；"几乎"来自两者更新次序在边缘帧的差 ⇒ 表现为抖动 |
+| **跳跃不够高** | 跳跃的 Y 同样走 `Move()`（`_verticalVelocity` 也是**代码算的位移**）⇒ 被同一条规则抹平 |
+| **走路 / 跑步动画根本没播（停在 Idle 姿势）** | ⚠️ 不是滑步，是**真没播**：位移被夺 ⇒ `CharacterController.velocity ≈ 0` ⇒ 本工程把 `_animationBlend` 挂在这个**实测速度**上 ⇒ `Speed ≈ 0` ⇒ 1D Blend Tree 停在阈值 0 的 `Idle`。链条见 §3.1 |
+| **跳跃动画正常** | 跳跃的驱动量是 **`bool`**（`Grounded` / `Jump` / `FreeFall`，来自**输入与探针**）⇒ 与位移测量无关 ⇒ 状态机照常 `JumpStart → InAir → JumpLand` |
+
+### 3.1 为什么"动作"也跟着死 —— 参数挂在「意图」还是「实测」上
+
+位移一被夺走，动画死不死，**取决于状态机参数从哪儿取数**（`ThirdPersonController.cs` 实测行号）：
+
+| 步 | 位置 | 发生什么 |
+|---|---|---|
+| ① | Animator `applyRootMotion = True` | 每帧把 `rootPosition`（≈ 起点，剪辑全烘焙）写回 `transform` |
+| ② | `:273` `_controller.Move(...)` | 代码刚走出的距离被①抹掉 |
+| ③ | **`:224` `currentHorizontalSpeed = _controller.velocity.magnitude`** | `CharacterController.velocity` 反映的是**它自己 `Move()` 的结果** ⇒ 被外部改 Transform 后 ≈ **0** |
+| ④ | `:235` `_speed = Lerp(currentHorizontalSpeed, targetSpeed × inputMagnitude, …)` | 每帧都从 **0** 重新起跳 ⇒ `_speed` 卡在 ≈ 0.06，**永远上不去** |
+| ⑤ | **`:250` `_animationBlend = Lerp(_animationBlend, _speed, …)`** → `:279` `SetFloat("Speed")` | `Speed ≈ 0` ⇒ Blend Tree 落在 `Idle` ⇒ **动作不做** |
+
+⭐ **判据：同一个"走跑动画"，参数取「意图」，还是取「实测」？**
+
+| 参数来源 | 位移被夺走后 | 代价 / 收益 |
+|---|---|---|
+| **意图**（原版 Starter Assets：`_animationBlend` 跟 `targetSpeed`） | 动作**照常播** | 收益 = 断位移不断动作；代价 = **「轻推 + 冲刺」时动作档位与实际速度脱钩**（滑步，本工程登记过这笔债） |
+| **实测**（本工程 10-22 改：跟 `_speed`） | 动作**跟着死**（停在 Idle） | 收益 = **权重与位移同源**，走速 ⇒ 走动画、跑速 ⇒ 跑动画；代价 = **位移一断，动画也断** |
+
+> ⚠️ 这两条**不是两个 bug，是同一个决策的两面**。10-22 那笔改动消掉"档位脱钩"，同时把"动画 ↔ 位移"焊成了强耦合 —— 本次 A 实验正好把这条耦合**反向**照了出来。
+
+⭐⭐ **本章最值钱的两条**：
+> ① **「姿势」与「位移」是两条独立通道，Root Motion 只夺位移、不夺姿势**（所以跳跃动画看着没问题）。
+> ② **但参数可以把两条通道焊在一起** —— 一旦 `float` 参数取自实测位移，**位移的死会顺着参数传导成动作的死**。
+
+⇒ **症状指纹**：**走 / 跑不动、跳不高、动作停住 ⇒ 先查 root motion**（勾选框 + 三条 bake 通道 + 看谁在写 `transform`）；**位移对而动作不对 ⇒ 查状态机 / 参数来源 / 过渡**。
+
+### 4. 判据清单（落纸版）
+
+| # | 判据 | 怎么验 |
+|---|---|---|
+| ① | **位移由代码写 ⇒ `Apply Root Motion` 一律关**（CharacterController / `rb.linearVelocity` / `Translate` 任一条在场就是代码驱动） | 看 Animator 勾选框 + 找谁在写 `transform` |
+| ② | **只有"动画该带位移"时才开**（走跑跳由动画驱动，脚不打滑） | clip 的 XZ/Y 通道 `Bake Into Pose` 必须**关闭** |
+| ③ | **判定依据 = clip 三通道，不是包名、不是预览** | `.fbx.meta` 的 `keepOriginalOrientation` / `keepOriginalPositionY` / `keepOriginalPositionXZ` |
+| ④ | **写了 `OnAnimatorMove` ⇒ 自动应用关闭，位移全归你** | 编辑器里属性显示 `Handled by Script`；不自己消费 `deltaPosition` 就**原地不动** |
+| ⑤ | **`deltaRotation` 是累乘不是赋值** | `transform.rotation *= animator.deltaRotation` |
+| ⑥ | **Y 通道的 bake 还管 `gravityWeight`**（1 / 0，切换会被混合） | 跳跃类剪辑要关 Y 烘焙才谈得上"高度由动画给" |
+| ⑦ | **侧移剪辑不能用默认 `Based Upon = Body Orientation`** | 改 `Offset` / `Original`（`Run_S` 就是标准侧移样本） |
+| ⑧ | **`CharacterController` 与 root motion 天然冲突** | CC 有自己的内部位置状态，`transform` 被 Animator 覆盖后两者**分裂** ⇒ 抖动 / 卡墙 / 穿模 |
+| ⑨ | **要"动画带路 + 物理碰撞"⇒ 只能 `OnAnimatorMove` 里自己消费 delta 再 `Move()`** | 官方 `Scripting Root Motion` 那页就是这个 recipe（但它演示的是"用曲线当速度"，**不是** deltaPosition，两者别混） |
+| ⑩ | **`float` 参数（Speed / MotionSpeed）挂「实测位移」⇒ 位移一断，动作跟着断** | 实验判据：Play 时读 `Speed` ≈ 0 而 `_controller.velocity` ≈ 0、输入却按着 ⇒ 就是这条（本工程 §3.1 实测） |
+
+### 5. 接缝（与第 37 章的关系）
+
+37 章量出：走 **0.48 s/步** → 跑 **0.34 s/步** 只有 **1.4×**，而速度差 **2.67×** ⇒ **缺口只能由步幅补**。
+**Root Motion 就是"让步幅自己说话"的那条路** —— 动画带位移时，步幅 = 剪辑位移，脚不打滑；代价 = 位移不再受代码控制（速度、转向、碰撞全部要重新接管）。**所以它是"要不要交出位移所有权"的取舍，不是"高级开关"。**
+
+### 6. 纪律
+
+- **实验只在 Play 里做**：Play 模式的改动不落盘（且 Unity 不允许 Play 时保存场景）⇒ 停止即还原；**验证手法 = 用 MCP 读回 `applyRootMotion` + `deltaPosition`**，别凭记忆。
+- **动画事件名 / 参数名 / `Based Upon` 三处改任一处都要回头核一遍**（都是"静默失效"型配置：错了一点不报错，只是不动）。
+- ⚠️ 官方 `OnAnimatorMove` 示例用的是 `rb.velocity`，Unity 6 里脚本 API 是 `rb.linearVelocity`（`velocity` 属旧接口）—— 照抄前先核一遍当前版本。
+
 ## 📌 回访清单（学到对应内容时回来重构）
 
 > ### 📋 本清单的使用规范（2026-10-11 定）
