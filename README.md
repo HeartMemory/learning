@@ -21,6 +21,16 @@ Learning/
 >
 > **大素材不进 git**：模型 / 贴图 / 音频原文件放仓库外的素材库，用时拷进工程并由 `.gitignore` 排除；仓库只留 `Assets/` 下的脚本、场景、预制体、动画与配置资产。
 
+## 环境要求与本地运行
+
+> 本仓库是**个人学习打卡记录**（Unity 客户端方向），代码与笔记都公开，供参考或对照。
+
+| 部分 | 需要什么 | 怎么跑 |
+|---|---|---|
+| `CSharpPractice/` · `LeetCode/` | **.NET SDK 8.0 或更高**（每个目录都是独立控制台工程，`net8.0`） | 进到具体题目 / 练习目录，终端执行 **`dotnet run`**（**不要用 IDE 的 F5**：用到 `Console.ReadKey` 的会因输入重定向报错） |
+| `Projects/Unity/` · `UnityPractice/` | **Unity 6.3 LTS（6000.3.x）**，工程用 **URP** 模板；部分工程依赖 **Cinemachine / Input System** 包 | 用 Unity Hub 添加对应目录打开；⚠️ **练习工程的 Asset Store 素材本体不在仓库里**，按 [UnityPractice/素材还原.md](UnityPractice/素材还原.md) 装回后再运行 |
+| `demos/` | 无 | 直接播放（作品演示素材） |
+
 ## 打卡规则
 
 1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
