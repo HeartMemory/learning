@@ -72,3 +72,17 @@ crashlytics-build.properties
 # ---- ⑥ VS 打开 Unity 工程时生成的升级日志（垃圾文件，不该入库）----
 UpgradeLog*.htm
 _Recovery/
+
+# ---- ⑦ Asset Store 素材【本体】不入库（许可不允许再分发源文件）----
+#   为什么：Asset Store EULA 禁止 "distribute / reproduce / copy" 原始资源文件；
+#           公开仓库里的 .fbx / .png 就是"谁都能拿走直接用"的源文件。
+#   只排资产本体，下面这些【一个都不能少】：
+#     ✅ *.meta（存 GUID，删了 = 场景/预制体/材质引用全断）
+#     ✅ *.cs / *.prefab / *.controller / *.mat / *.inputactions（代码与结构）
+#   ⚠️ CC0 素材（如 Quaternius UAL）不受此限，可以入库。
+#   ⚠️ clone 后如何还原 → UnityPractice/素材还原.md
+AnimLab/Assets/Starter Assets/**/*.tif
+AnimLab/Assets/Starter Assets/**/*.fbx
+AnimLab/Assets/Starter Assets/**/*.png
+AnimLab/Assets/Starter Assets/**/*.exr
+AnimLab/Assets/Starter Assets/**/*.wav
