@@ -10,7 +10,8 @@
 | **S0** | Python 迁移（uv / 类型注解 / async / httpx / pydantic） | `practice/` 下小工具（并发抓取 + 存 JSON） | 🔄 **环境就绪（10-28）** · 练习未开始 |
 | **S1** | LLM API：流式 / 结构化输出 / token 与成本 / prompt | `projects/llm-cli/` | ⬜ |
 | **S2** | **手写 Agent（禁用框架）**：工具调用 / ReAct / trace / 重试 | `projects/mini-agent/` | ⬜ |
-| **S3** | RAG + 评测：切分 / embedding / 检索 / eval 集 | `projects/rag-notes/` | ⬜ |
+| **S3** | RAG + 评测：切分 / embedding / 检索 / eval 集 / **失败归因三分法** | `projects/rag-notes/` | ⬜ |
+| **S3.5** | **Agent 安全与红队**：提示注入 / 间接注入 / 工具越权 / 沙箱 / guardrails | `projects/redteam-report/` | ⬜ |
 | **S4** | LangGraph / MCP server / 观测 / FastAPI + Docker | `projects/mcp-server/` + LangGraph 重写对比 | ⬜ |
 | **S5** | 旗舰项目（双简历通用：游戏场景 Agent） | `projects/game-agent/` | ⬜ |
 | 并行 | 底层原理：手敲一遍 nanoGPT（每周 1-2h） | `practice/nanogpt-notes/` | ⬜ |
