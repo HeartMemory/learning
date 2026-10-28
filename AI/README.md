@@ -7,7 +7,7 @@
 
 | 阶段 | 内容 | 交付物 | 状态 |
 |---|---|---|---|
-| **S0** | Python 迁移（uv / 类型注解 / async / httpx / pydantic） | `practice/` 下小工具（并发抓取 + 存 JSON） | ⬜ 未开始 |
+| **S0** | Python 迁移（uv / 类型注解 / async / httpx / pydantic） | `practice/` 下小工具（并发抓取 + 存 JSON） | 🔄 **环境就绪（10-28）** · 练习未开始 |
 | **S1** | LLM API：流式 / 结构化输出 / token 与成本 / prompt | `projects/llm-cli/` | ⬜ |
 | **S2** | **手写 Agent（禁用框架）**：工具调用 / ReAct / trace / 重试 | `projects/mini-agent/` | ⬜ |
 | **S3** | RAG + 评测：切分 / embedding / 检索 / eval 集 | `projects/rag-notes/` | ⬜ |
@@ -28,9 +28,12 @@ AI/
 
 | 需要什么 | 怎么跑 |
 |---|---|
-| **Python 3.12+** + **uv** | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（每个项目自带 `pyproject.toml` + `uv.lock`） |
+| **Python 3.12+**（实测 **3.13.7**）+ **uv**（实测 **0.12.23**） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（每个项目自带 `pyproject.toml` + `uv.lock`） |
 | 模型 key | 只写各项目根目录的 **`.env`**（**不入库**）；仓库里只保留 **`.env.example`** 模板 |
-| 代码检查 | `uv run ruff check .` |
+| 代码检查 | `uv run ruff check .`（配置在项目 `pyproject.toml`；中文注释已 ignore `RUF001`/`002`/`003`） |
+| 依赖下载慢（国内） | 配**用户级** `%APPDATA%\uv\uv.toml` → `[[index]]` + `url = "https://mirrors.aliyun.com/pypi/simple"` + `default = true`（**在仓库外，不进 git**）；⚠️ `--index-url` 已废弃，改用 `--default-index` |
+| 环境自检样板 | [`practice/2026-10-28-python-env/`](practice/2026-10-28-python-env/README.md)：`uv sync` → `uv run python check_env.py` → `uv run ruff check .` |
+| 编辑器扩展 | `ms-python.python`（含 Pylance / debugpy）· **`charliermarsh.ruff`**（实时告警 + 保存时格式化）· `tamasfe.even-better-toml` · `usernamehw.errorlens` · `ms-toolsai.jupyter`；⚠️ **打开工程后要手动选一次 `.venv` 解释器**；⚠️ **别装 flake8 / pylint / black / isort**（与 ruff 打架） |
 
 ## 纪律（硬规则）
 
