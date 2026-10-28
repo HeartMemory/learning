@@ -16,3 +16,25 @@ Thumbs.db
 
 # 交接文档（含个人信息，不上传）
 HANDOVER.md
+
+# ===== Python / AI 主线（2026-10-28 起）=====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# 密钥与本地配置：.env 永不入库，模板 .env.example 入库
+.env
+.env.*
+!.env.example
+*.key
+secrets.*
+
+# 运行产物（trace / 日志 / 缓存）
+*.log
+runs/
+.cache/
