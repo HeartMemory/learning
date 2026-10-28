@@ -1,19 +1,20 @@
 # 每日学习打卡仓库
 
-> 目标：Unity 客户端开发方向 ｜ 阶段：**Phase 1 开局 · Animator 动画机**（**Phase 0 打地基 · 2026-10-21 验收完成**：① C# 带文件存取 + 异常 ② 可玩 2D ③ 3D 跑酷雏形 —— 三项逐项核对达标；第 4 项题数当天 **54 / 60**，当场确认**延后到 11-01 结账（≥64）**）
+> **🔄 2026-10-28 转型：主线改为「智能体 / 大模型应用」**（Python）。Unity / C# 线**冻结为作品集**，不再扩写；算法降为**每周 3 题**。AI 主线代码全部在 [`AI/`](AI/README.md)。
+> 目标：**AI 应用 / Agent 方向**（2027 暑假实习，游戏公司与 AI 岗双投）｜ 阶段：**转型过渡期（10-29–11-01）→ Block 6（S0 Python 迁移 + S1 LLM 原生层）**
+> ~~旧口径（已归档，勿照做）：Unity 客户端开发方向 · Phase 1 开局 · Animator 动画机~~
 > 每天 2-3 小时，学完必须 commit —— **GitHub 绿格子就是学习日历**
 
 ## 目录结构
 
 ```
 Learning/
+├── AI/                # ★ 主线（2026-10-28 起）：practice/ 练习 + projects/ 交付物
 ├── LeetCode/          # 算法题解（按题组织：题号-题名/，详见 LeetCode/README.md）
-├── CSharpPractice/    # C# 主线练习（按 年/月/日/主题 组织，详见 CSharpPractice/README.md）
-├── Projects/          # 里程碑成品（按技术栈分大类）
-│   ├── CSharp/        #   C# 完成的工具/项目（如 Calculator 循环菜单版）
-│   └── Unity/         #   Unity 游戏（第 4 周起）
-├── UnityPractice/     # Unity 技术练习工程（与 CSharpPractice 对称；不占成品编号）
-├── Notes/             # 每日复盘（年/月/日：YYYY/MM/DD.md）+ 错题本 + C#/Unity 基础笔记
+├── CSharpPractice/    # 🔒 冻结：C# 练习（2026-10-28 前）
+├── Projects/          # 🔒 冻结：里程碑成品（CSharp/ + Unity/，作品集，不回改）
+├── UnityPractice/     # 🔒 冻结：Unity 技术练习工程
+├── Notes/             # 每日复盘（年/月/日：YYYY/MM/DD.md）+ 错题本 + C#/Unity/AI 三册笔记
 └── README.md          # 本文件
 ```
 
@@ -23,10 +24,11 @@ Learning/
 
 ## 环境要求与本地运行
 
-> 本仓库是**个人学习打卡记录**（Unity 客户端方向），代码与笔记都公开，供参考或对照。
+> 本仓库是**个人学习打卡记录**（**AI 主线** + 历史 Unity/C# 学习记录），代码与笔记都公开，供参考或对照。
 
 | 部分 | 需要什么 | 怎么跑 |
 |---|---|---|
+| **`AI/`**（主线） | **Python 3.12+** + **uv**；模型 key 放各项目 `.env`（不入库，模板为 `.env.example`） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`；索引见 [AI/README.md](AI/README.md) |
 | `CSharpPractice/` · `LeetCode/` | **.NET SDK 8.0 或更高**（每个目录都是独立控制台工程，`net8.0`） | 进到具体题目 / 练习目录，终端执行 **`dotnet run`**（**不要用 IDE 的 F5**：用到 `Console.ReadKey` 的会因输入重定向报错） |
 | `Projects/Unity/` · `UnityPractice/` | **Unity 6.3 LTS（6000.3.x）**，工程用 **URP** 模板；部分工程依赖 **Cinemachine / Input System** 包 | 用 Unity Hub 添加对应目录打开；⚠️ **练习工程的 Asset Store 素材本体不在仓库里**，按 [UnityPractice/素材还原.md](UnityPractice/素材还原.md) 装回后再运行 |
 | `demos/` | 无 | 直接播放（作品演示素材） |
@@ -35,8 +37,9 @@ Learning/
 
 1. **LeetCode 按题上传**：一题一个独立目录 + 一次 commit，题解索引见 LeetCode/README.md
 2. **其他内容按天上传**：C# 练习目录按 年/月/日/主题 组织（如 `CSharpPractice/2026/08/27/HelloWorld`），复盘写进 Notes/
-3. 提交信息格式：`MM-DD: [主题] 描述`
+3. 提交信息格式：`MM-DD: [主题] 描述`（**AI 主线用 `[AI]`**，算法 `[算法]`、笔记 `[笔记]`）
 4. 每日复盘三句话 → Notes/YYYY/MM/DD.md
+5. **AI 主线纪律（2026-10-28 起）**：AI 代码放 `AI/practice/` 或 `AI/projects/`；交付物必须带 README + 实测数字；**`.env` 与 key 永不入库**；**S2 之前禁止引入 langchain / langgraph**；算法改**每周 3 题**
 
 ## 打卡进度
 
