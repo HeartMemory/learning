@@ -10,4 +10,4 @@
 | 目录 | 主题 | 关键判据（实测） |
 |---|---|---|
 | `2026-10-28-python-env/` | uv 工程骨架 + 环境自检（S0 前置） | `uv run python check_env.py` 9 个包无 MISSING；`uv run ruff check .` 全绿；`sys.prefix` 指向本工程 `.venv` |
-| `2026-10-29-llm-hello/` | **模型 API 打通**（过渡期闸门 · 第一次 chat.completions） | 正文非空 + 打印 `usage` 三个 token 数 + 端到端耗时；**换模型只改 `.env` 三个变量、`ask.py` 一行不动**（待跑通填实测数字） |
+| `2026-10-29-llm-hello/` | **模型 API 打通**（过渡期闸门 · 第一次 chat.completions） | 正文非空 + 打印 `usage` 三个 token 数 + 端到端耗时；**换模型只改 `.env` 三个变量、`ask.py` 一行不动**。✅ **已跑通（10-29）**：`deepseek-flash` / 38·58·96 tokens / **1254.49 ms**（复跑 1303.34 ms） |

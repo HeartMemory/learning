@@ -53,11 +53,20 @@ uv run python ask.py
 | 报连接超时但网络正常 | `BASE_URL` 指到了被墙的域名 |
 | 改了 `.env` 不生效 | 变量名拼错（**必须**是 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`） |
 
-## 实测数字（跑通后填）
+## 实测数字（2026-10-29 跑通）
 
 | 项 | 值 |
 |---|---|
-| 模型 | 待填 |
-| prompt_tokens / completion_tokens / total_tokens | 待填 |
-| 端到端耗时 | 待填 |
-| 日期 | 2026-10-29 |
+| 模型 | **`deepseek-flash`**（BASE_URL = `https://api.deepseek.com`） |
+| prompt_tokens / completion_tokens / total_tokens | **38 / 58 / 96** |
+| 端到端耗时 | **1254.49 ms** |
+| 判据 1（正文非空） | ✅ |
+| 判据 2（token 三数来自 `usage`） | ✅ |
+| 判据 3（端到端耗时） | ✅ |
+
+⚠️ **一个值得记的发现**：`usage.completion_tokens_details.reasoning_tokens = 38` ⇒ **该模型默认走思考模式**，58 个 completion token 里有 38 个是"想"掉的。这意味着「便宜 = 快 = 不用思考」的假设不成立，后面算成本要把 reasoning tokens 一起算。
+
+## 待做（可选，不算闸门）
+
+- [ ] **换模型一行验证**：把 `.env` 的 `LLM_MODEL` 改成 `deepseek-v4-pro`，跑一次，确认**代码一行不改**也能通 —— 这是 S1「provider 抽象层」的预热
+- [ ] 把 `print("token 用量：", response.usage)` 改成打印三个独立字段（现在是一整串 `CompletionUsage(...)`，数字在里面但不好读）
