@@ -29,7 +29,7 @@ AI/
 
 | 需要什么 | 怎么跑 |
 |---|---|
-| **Python 3.12+**（实测 **3.13.7**）+ **uv**（实测 **0.12.23**） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（每个项目自带 `pyproject.toml` + `uv.lock`） |
+| **Python 3.14+**（实测 **3.14.8**）+ **uv**（实测 **0.12.23**） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（每个项目自带 `pyproject.toml` + `.python-version` + `uv.lock`） |
 | 模型 key | 只写各项目根目录的 **`.env`**（**不入库**）；仓库里只保留 **`.env.example`** 模板 |
 | 代码检查 | `uv run ruff check .`（配置在项目 `pyproject.toml`；中文注释已 ignore `RUF001`/`002`/`003`） |
 | 依赖下载慢（国内） | 配**用户级** `%APPDATA%\uv\uv.toml` → `[[index]]` + `url = "https://mirrors.aliyun.com/pypi/simple"` + `default = true`（**在仓库外，不进 git**）；⚠️ `--index-url` 已废弃，改用 `--default-index` |

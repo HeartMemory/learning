@@ -2,7 +2,7 @@
 name = "python-env"
 version = "0.1.0"
 description = "S0 环境基线：uv 工程骨架 + 环境自检"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "httpx",
     "openai>=3.40.0",
@@ -22,7 +22,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

@@ -28,8 +28,8 @@ Learning/
 
 | 部分 | 需要什么 | 怎么跑 |
 |---|---|---|
-| **`AI/`**（主线） | **Python 3.12+**（实测 **3.13.7**）+ **uv**（实测 **0.12.23**）；模型 key 放各项目 `.env`（不入库，模板为 `.env.example`） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（或 `uv run python <脚本>.py`）；静态检查 `uv run ruff check .`；环境自检样板见 [practice/2026-10-28-python-env](AI/practice/2026-10-28-python-env/README.md)；⚠️ 国内下载慢需配用户级 `%APPDATA%\uv\uv.toml` 镜像，索引见 [AI/README.md](AI/README.md) |
-| `LeetCode/`（**2026-10-28 起新题 = Python**） | 新题只要 **Python 3.12+**（标准库即可，**不需要 venv**）；10-28 前的旧题解是 C#，需 **.NET SDK 8.0+** | 新题：进到题目目录执行 `python solution.py`；旧题：`dotnet run` |
+| **`AI/`**（主线） | **Python 3.14+**（实测 **3.14.8**）+ **uv**（实测 **0.12.23**）；模型 key 放各项目 `.env`（不入库，模板为 `.env.example`） | 进到具体项目目录：`uv sync` → `uv run python -m <模块>`（或 `uv run python <脚本>.py`）；静态检查 `uv run ruff check .`；环境自检样板见 [practice/2026-10-28-python-env](AI/practice/2026-10-28-python-env/README.md)；⚠️ 国内下载慢需配用户级 `%APPDATA%\uv\uv.toml` 镜像，索引见 [AI/README.md](AI/README.md) |
+| `LeetCode/`（**2026-10-28 起新题 = Python**） | 新题只要 **Python 3.14+**（标准库即可，**不需要 venv**）；10-28 前的旧题解是 C#，需 **.NET SDK 8.0+** | 新题：进到题目目录执行 `python solution.py`（**想用 3.14 就跑 `uv run --python 3.14 python solution.py`**）；旧题：`dotnet run` |
 | `CSharpPractice/`（🔒 冻结） | **.NET SDK 8.0 或更高**（每个目录都是独立控制台工程，`net8.0`） | 进到练习目录，终端执行 **`dotnet run`**（**不要用 IDE 的 F5**：用到 `Console.ReadKey` 的会因输入重定向报错） |
 | `Projects/Unity/` · `UnityPractice/` | **Unity 6.3 LTS（6000.3.x）**，工程用 **URP** 模板；部分工程依赖 **Cinemachine / Input System** 包 | 用 Unity Hub 添加对应目录打开；⚠️ **练习工程的 Asset Store 素材本体不在仓库里**，按 [UnityPractice/素材还原.md](UnityPractice/素材还原.md) 装回后再运行 |
 | `demos/` | 无 | 直接播放（**Unity 成品演示素材**：随简历再录，**非主线产物**） |

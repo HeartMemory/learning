@@ -17,7 +17,7 @@
 
 | 项 | 值 |
 |---|---|
-| Python | **3.13.7**（`pyproject.toml` 要求 `>=3.12`；`.python-version` 锁 3.13） |
+| Python | **3.14.8**（**2026-10-29 由 3.13.7 升级**；`pyproject.toml` 要求 `>=3.14`；`.python-version` 锁 3.14） |
 | uv | **0.12.23** |
 | OS | Windows 11 |
 | 下载源 | 用户级 `%APPDATA%\uv\uv.toml`（阿里云镜像；**在仓库外，不进 git**） |
@@ -31,6 +31,20 @@ uv sync                      # 建 .venv + 按 uv.lock 装依赖
 uv run python check_env.py   # 环境自检：打印解释器与各包版本
 uv run ruff check .          # 静态检查
 ```
+
+## 3.14 升级记录（2026-10-29）
+
+| 项 | 变更前 | 变更后 |
+|---|---|---|
+| 解释器 | 3.13.7 | **3.14.8**（`uv python list` 里最新的**正式版**；3.15 只有 `rc3`，不上） |
+| `.python-version` | `3.13` | `3.14` |
+| `requires-python` | `>=3.12` | `>=3.14` |
+| ruff `target-version` | `py312` | `py314`（ruff 0.17.3 已支持） |
+| `from __future__ import annotations` | 有 | **删**（3.14 起注解默认延迟求值，该写法已 deprecated） |
+
+**验证（实测）**：`uv run python -V` = **3.14.8**；`check_env.py` 9 个包**零 MISSING**；`ruff check` **全绿**（`py314` 目标可用）；`check_llm.py` 接入探针 **HTTP 200**。
+
+⚠️ **系统 `python` 命令没变**：仍是 `D:\python` 的 3.13.7 —— uv 装的是它自己管理的解释器（`%APPDATA%\uv\python\`），**不动系统安装**。
 
 ## 编辑器（CodeBuddy / VS Code）
 

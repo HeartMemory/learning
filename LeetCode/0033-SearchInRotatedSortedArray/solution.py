@@ -9,8 +9,6 @@
 #   3. 收缩必须让区间**严格变小**（`lo = mid` 在 mid == lo 时就是死循环）。
 #
 # 运行： python solution.py
-from __future__ import annotations
-
 import io
 import random
 import sys
