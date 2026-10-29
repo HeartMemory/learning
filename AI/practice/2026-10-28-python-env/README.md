@@ -44,7 +44,12 @@ uv run ruff check .          # 静态检查
 
 **验证（实测）**：`uv run python -V` = **3.14.8**；`check_env.py` 9 个包**零 MISSING**；`ruff check` **全绿**（`py314` 目标可用）；`check_llm.py` 接入探针 **HTTP 200**。
 
-⚠️ **系统 `python` 命令没变**：仍是 `D:\python` 的 3.13.7 —— uv 装的是它自己管理的解释器（`%APPDATA%\uv\python\`），**不动系统安装**。
+⚠️ **本机两套解释器并存，别混**：
+
+- **uv 自管**（`%APPDATA%\uv\python\`，本工程用这套）：`uv run python` 走这里
+- **系统 `python`**：2026-10-29 当日晚**已另外补装 3.14.8** 到 `%LOCALAPPDATA%\Programs\Python\Python314`（PATH 最前，带成对的 `pip`）
+
+⇒ **工程内一律 `uv run python`**；裸 `python` 现在也是 3.14，但它**看不到本工程 `.venv` 里装的包**，别用它跑本工程的脚本。
 
 ## 编辑器（CodeBuddy / VS Code）
 
